@@ -1,3 +1,0 @@
-openai>=2.30.0
-outlines>=1.2.12
-pydantic>=2

@@ -18,3 +18,4 @@ env/
 
 .idea/
 .vscode/
+*egg-info*
