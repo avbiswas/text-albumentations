@@ -1,7 +1,7 @@
 from text_albumentations.runtime import (
     DEFAULT_MODEL_NAME,
+    OutlinesModel,
     build_mlx_outlines_model,
-    create_outlines_runtime,
     get_default_outlines_runtime,
 )
 
@@ -42,4 +42,4 @@ model = build_mlx_outlines_model(model_name)
 
 
 def create_model_runtime(model):
-    return create_outlines_runtime(model)
+    return OutlinesModel(model)

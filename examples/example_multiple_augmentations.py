@@ -1,8 +1,9 @@
 # Demonstrates running multiple augmentations over the same passage and combining all generated rows.
 
 import openai
+import outlines
 
-from text_albumentations import create_openai_runtime, run_augmentation
+from text_albumentations import OutlinesModel, run_augmentation
 from text_albumentations.tasks.bullets import bullet_augmentation
 from text_albumentations.tasks.continuation import continuation_augmentation
 from text_albumentations.tasks.qa_pairs import qa_pair_augmentation
@@ -27,7 +28,8 @@ AUGMENTATIONS = [
 
 
 def main():
-    runtime = create_openai_runtime(openai.OpenAI(), MODEL_NAME, async_mode=False)
+    model = outlines.from_openai(openai.OpenAI(), MODEL_NAME)
+    runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
 
     all_rows = []
     for name, augmentation in AUGMENTATIONS:

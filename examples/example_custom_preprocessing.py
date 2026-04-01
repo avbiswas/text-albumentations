@@ -1,12 +1,13 @@
 # Demonstrates extending the pipeline with a custom preprocessed Pydantic input model.
 
 from openai import OpenAI
+import outlines
 from pydantic import BaseModel, Field
 
 from text_albumentations import (
     AlpacaResponseFormat,
     BaseAugmentation,
-    create_openai_runtime,
+    OutlinesModel,
     run_augmentation,
 )
 from text_albumentations.output_format_adapters import BaseAlpacaAdapter
@@ -92,7 +93,8 @@ def main():
     """
 
     preprocessed = preprocess(raw_text, source="custom-preprocessor")
-    runtime = create_openai_runtime(OpenAI(), MODEL_NAME, async_mode=False)
+    model = outlines.from_openai(OpenAI(), MODEL_NAME)
+    runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
     augmentation = CustomPreprocessedBulletAugmentation()
 
     rows = run_augmentation(preprocessed, augmentation, runtime)

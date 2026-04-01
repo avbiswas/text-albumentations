@@ -122,15 +122,13 @@ See [`examples/example_minimal.py`](/Users/avishekbiswas/Projects/text-albumenta
 
 ```python
 import openai
+import outlines
 
-from text_albumentations import create_openai_runtime, run_augmentation
+from text_albumentations import OutlinesModel, run_augmentation
 from text_albumentations.tasks.bullets import bullet_augmentation
 
-runtime = create_openai_runtime(
-    openai.OpenAI(),
-    "gpt-5.4-nano",
-    async_mode=False,
-)
+model = outlines.from_openai(openai.OpenAI(), "gpt-5.4-nano")
+runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
 
 rows = run_augmentation("some passage", bullet_augmentation, runtime)
 ```
@@ -142,17 +140,19 @@ See [`examples/example_openai_sync.py`](/Users/avishekbiswas/Projects/text-album
 ```python
 import asyncio
 import openai
+import outlines
 
-from text_albumentations import arun_augmentation, create_openai_runtime
+from text_albumentations import OutlinesModel, arun_augmentation
 from text_albumentations.tasks.bullets import bullet_augmentation
 
 
 async def main():
-    runtime = create_openai_runtime(
-        openai.AsyncOpenAI(),
-        "gpt-5.4-nano",
+    model = outlines.from_openai(openai.AsyncOpenAI(), "gpt-5.4-nano")
+    runtime = OutlinesModel(
+        model,
         async_mode=True,
         total_concurrent_calls=4,
+        max_tokens_parameter="max_completion_tokens",
     )
 
     rows = await arun_augmentation("some passage", bullet_augmentation, runtime)
@@ -164,15 +164,41 @@ asyncio.run(main())
 
 See [`examples/example_openai_async.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/example_openai_async.py).
 
+### Transformers Local Model
+
+```python
+import outlines
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from text_albumentations import OutlinesModel, run_augmentation
+from text_albumentations.tasks.bullets import bullet_augmentation
+
+hf_model = AutoModelForCausalLM.from_pretrained(
+    "google/gemma-3-1b-it",
+    torch_dtype="auto",
+    device_map="auto",
+)
+hf_tokenizer = AutoTokenizer.from_pretrained("google/gemma-3-1b-it")
+
+model = outlines.from_transformers(hf_model, hf_tokenizer)
+runtime = OutlinesModel(model, max_tokens_parameter="max_new_tokens")
+
+rows = run_augmentation("some passage", bullet_augmentation, runtime)
+```
+
+See [`examples/example_transformers_gemma.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/example_transformers_gemma.py).
+
 ### Long Text To JSONL
 
 ```python
 import openai
+import outlines
 
-from text_albumentations import create_openai_runtime, save_long_text_dataset
+from text_albumentations import OutlinesModel, save_long_text_dataset
 from text_albumentations.tasks.bullets import bullet_augmentation
 
-runtime = create_openai_runtime(openai.OpenAI(), "gpt-5.4-nano", async_mode=False)
+model = outlines.from_openai(openai.OpenAI(), "gpt-5.4-nano")
+runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
 
 save_long_text_dataset(
     text=long_text,
@@ -189,12 +215,14 @@ See [`examples/example_long_text_to_jsonl.py`](/Users/avishekbiswas/Projects/tex
 
 ```python
 import openai
+import outlines
 
-from text_albumentations import create_openai_runtime, run_augmentation
+from text_albumentations import OutlinesModel, run_augmentation
 from text_albumentations.tasks.bullets import bullet_augmentation
 from text_albumentations.tasks.rephrase import rephrase_augmentation
 
-runtime = create_openai_runtime(openai.OpenAI(), "gpt-5.4-nano", async_mode=False)
+model = outlines.from_openai(openai.OpenAI(), "gpt-5.4-nano")
+runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
 
 rows = []
 rows.extend(run_augmentation("some passage", bullet_augmentation, runtime))

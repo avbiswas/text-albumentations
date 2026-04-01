@@ -1,8 +1,9 @@
-# Demonstrates sync OpenAI usage through the runtime wrapper for a single augmentation.
+# Demonstrates sync OpenAI usage when the user creates the Outlines OpenAI model outside the library.
 
 import openai
+import outlines
 
-from text_albumentations import create_openai_runtime, run_augmentation
+from text_albumentations import OutlinesModel, run_augmentation
 from text_albumentations.tasks.bullets import bullet_augmentation
 
 
@@ -12,11 +13,8 @@ PASSAGE = "The Transformer replaces recurrence with attention and improves paral
 
 def main():
     client = openai.OpenAI()
-    runtime = create_openai_runtime(
-        client,
-        MODEL_NAME,
-        async_mode=False,
-    )
+    model = outlines.from_openai(client, MODEL_NAME)
+    runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
 
     print("client_type=OpenAI")
     print("runtime_mode=sync")

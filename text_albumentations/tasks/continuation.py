@@ -73,6 +73,7 @@ class ContinuationAugmentation(BaseSingleChunkAugmentation[ContinuationSlices]):
         self,
         passages: str,
         runtime: ModelRuntime,
+        response_format=None,
     ) -> ContinuationSlices:
         words = split_words(passages)
         word_count = len(words)

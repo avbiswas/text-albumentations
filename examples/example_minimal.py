@@ -10,7 +10,6 @@ from text_albumentations.tasks.bullets import bullet_augmentation
 MODEL_NAME = "mlx-community/Qwen3.5-4B-OptiQ-4bit"
 PASSAGE = "The Transformer replaces recurrence with attention and improves parallelization."
 
-
 def main():
     model = outlines.from_mlxlm(*mlx_lm.load(MODEL_NAME))
     runtime = OutlinesModel(model=model)
