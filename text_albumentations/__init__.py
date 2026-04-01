@@ -16,7 +16,9 @@ from text_albumentations.response_formats import (
 )
 from text_albumentations.runner import (
     AugmentationRunner,
+    arun_batch_augmentation,
     arun_augmentation,
+    run_batch_augmentation,
     run_augmentation,
 )
 from text_albumentations.runtime import (
@@ -43,6 +45,7 @@ __all__ = [
     "OutlinesModel",
     "OutlinesModelRuntime",
     "agenerate_rows_from_long_text",
+    "arun_batch_augmentation",
     "arun_augmentation",
     "asave_long_text_dataset",
     "build_mlx_outlines_model",
@@ -50,6 +53,7 @@ __all__ = [
     "generate_rows_from_long_text",
     "get_openai_async_semaphore",
     "get_default_outlines_runtime",
+    "run_batch_augmentation",
     "run_augmentation",
     "save_long_text_dataset",
     "save_dataset",

@@ -47,3 +47,27 @@ async def arun_augmentation(
         runtime=runtime,
         augmentation=augmentation,
     ).arun()
+
+
+def run_batch_augmentation(
+    data_batch: list[PassageT],
+    augmentation: BaseAugmentation,
+    runtime: ModelRuntime,
+) -> list[AlpacaDataset]:
+    validated_batch = [
+        augmentation.validate_passages(data)
+        for data in data_batch
+    ]
+    return augmentation.build_batch_dataset(validated_batch, runtime)
+
+
+async def arun_batch_augmentation(
+    data_batch: list[PassageT],
+    augmentation: BaseAugmentation,
+    runtime: ModelRuntime,
+) -> list[AlpacaDataset]:
+    validated_batch = [
+        augmentation.validate_passages(data)
+        for data in data_batch
+    ]
+    return await augmentation.abuild_batch_dataset(validated_batch, runtime)

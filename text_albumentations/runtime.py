@@ -64,7 +64,7 @@ class ModelRuntime(ABC):
         context: str | None = None,
         temperature: float = 0.5,
         max_tokens: int = 5000,
-    ) -> OutputT:
+        ) -> OutputT:
         return self.generate_variation(
             output,
             output_type,
@@ -72,6 +72,42 @@ class ModelRuntime(ABC):
             temperature=temperature,
             max_tokens=max_tokens,
         )
+
+    def generate_structured_batch(
+        self,
+        messages_batch: list[list[dict[str, str]]],
+        output_type: type[OutputT],
+        *,
+        temperature: float = 0.2,
+        max_tokens: int = 5000,
+    ) -> list[OutputT]:
+        return [
+            self.generate_structured(
+                messages,
+                output_type,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            for messages in messages_batch
+        ]
+
+    async def agenerate_structured_batch(
+        self,
+        messages_batch: list[list[dict[str, str]]],
+        output_type: type[OutputT],
+        *,
+        temperature: float = 0.2,
+        max_tokens: int = 5000,
+    ) -> list[OutputT]:
+        return [
+            await self.agenerate_structured(
+                messages,
+                output_type,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            for messages in messages_batch
+        ]
 
 
 class OutlinesModel(ModelRuntime):
@@ -189,6 +225,58 @@ class OutlinesModel(ModelRuntime):
                 ),
             )
         return output_type.model_validate_json(response)
+
+    def generate_structured_batch(
+        self,
+        messages_batch: list[list[dict[str, str]]],
+        output_type: type[OutputT],
+        *,
+        temperature: float = 0.2,
+        max_tokens: int = 5000,
+    ) -> list[OutputT]:
+        if self.async_mode:
+            raise RuntimeError(
+                "This runtime is configured for async mode. "
+                "Use 'await runtime.agenerate_structured_batch(...)' instead."
+            )
+
+        outputs = self.model.batch(
+            [Chat(messages) for messages in messages_batch],
+            output_type=output_type,
+            **self._build_generation_kwargs(
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ),
+        )
+        return [output_type.model_validate_json(output) for output in outputs]
+
+    async def agenerate_structured_batch(
+        self,
+        messages_batch: list[list[dict[str, str]]],
+        output_type: type[OutputT],
+        *,
+        temperature: float = 0.2,
+        max_tokens: int = 5000,
+    ) -> list[OutputT]:
+        if not self.async_mode:
+            return self.generate_structured_batch(
+                messages_batch,
+                output_type,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
+        semaphore = get_openai_async_semaphore(self.total_concurrent_calls)
+        async with semaphore:
+            outputs = await self.model.batch(
+                [Chat(messages) for messages in messages_batch],
+                output_type=output_type,
+                **self._build_generation_kwargs(
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                ),
+            )
+        return [output_type.model_validate_json(output) for output in outputs]
 
     def _build_generation_kwargs(
         self,

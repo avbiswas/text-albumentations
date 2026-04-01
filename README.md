@@ -51,6 +51,7 @@ The project currently supports:
 
 - single-chunk augmentations
 - multi-chunk augmentations
+- batched augmentation execution for many passages with one shared schema
 - typed structured outputs with Pydantic
 - Alpaca-format dataset generation
 - response-format control for the Alpaca `output` field
@@ -116,7 +117,7 @@ for row in rows:
     print(row.model_dump_json())
 ```
 
-See [`examples/example_minimal.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/example_minimal.py).
+See [`examples/minimal.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/minimal.py).
 
 ### OpenAI Sync
 
@@ -133,7 +134,7 @@ runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
 rows = run_augmentation("some passage", bullet_augmentation, runtime)
 ```
 
-See [`examples/example_openai_sync.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/example_openai_sync.py).
+See [`examples/openai_sync.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/openai_sync.py).
 
 ### OpenAI Async
 
@@ -162,7 +163,7 @@ async def main():
 asyncio.run(main())
 ```
 
-See [`examples/example_openai_async.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/example_openai_async.py).
+See [`examples/openai_async.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/openai_async.py).
 
 ### Transformers Local Model
 
@@ -186,7 +187,41 @@ runtime = OutlinesModel(model, max_tokens_parameter="max_new_tokens")
 rows = run_augmentation("some passage", bullet_augmentation, runtime)
 ```
 
-See [`examples/example_transformers_gemma.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/example_transformers_gemma.py).
+See the `examples/` directory for the current Transformers examples.
+
+### Batch Augmentation Over Multiple Passages
+
+```python
+import outlines
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from text_albumentations import OutlinesModel, run_batch_augmentation
+from text_albumentations.tasks.bullets import BulletAugmentation
+
+hf_model = AutoModelForCausalLM.from_pretrained(
+    "google/gemma-3-1b-it",
+    torch_dtype="auto",
+    device_map="auto",
+)
+hf_tokenizer = AutoTokenizer.from_pretrained("google/gemma-3-1b-it")
+
+model = outlines.from_transformers(hf_model, hf_tokenizer)
+runtime = OutlinesModel(model, max_tokens_parameter="max_new_tokens")
+augmentation = BulletAugmentation(max_tokens=128, variations=0)
+
+rows = run_batch_augmentation(
+    [
+        "The Transformer replaces recurrence with attention and improves parallelization.",
+        "Outlines constrains generation so outputs match the expected structure.",
+        "Synthetic supervision can be derived from raw documents with task-shaped prompts.",
+        "Batch decoding is useful when many passages share the same schema and augmentation.",
+    ],
+    augmentation,
+    runtime,
+)
+```
+
+See [`examples/batch_augmentation.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/batch_augmentation.py).
 
 ### Long Text To JSONL
 
@@ -209,7 +244,7 @@ save_long_text_dataset(
 )
 ```
 
-See [`examples/example_long_text_to_jsonl.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/example_long_text_to_jsonl.py).
+See [`examples/long_text_to_jsonl.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/long_text_to_jsonl.py).
 
 ### Multiple Augmentations Over The Same Passage
 
@@ -229,13 +264,13 @@ rows.extend(run_augmentation("some passage", bullet_augmentation, runtime))
 rows.extend(run_augmentation("some passage", rephrase_augmentation, runtime))
 ```
 
-See [`examples/example_multiple_augmentations.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/example_multiple_augmentations.py).
+See [`examples/multiple_augmentations.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/multiple_augmentations.py).
 
 ### Custom Preprocessing Model
 
 You can also make the augmentation input itself be a custom Pydantic model instead of a raw string.
 
-See [`examples/example_custom_preprocessing.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/example_custom_preprocessing.py).
+See [`examples/custom_preprocessing.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/custom_preprocessing.py).
 
 ## Extensibility
 

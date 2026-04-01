@@ -78,6 +78,16 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
             {"role": "user", "content": self.build_user_message(passages)},
         ]
 
+    def build_messages_batch(
+        self,
+        passages_batch: list[PassageT],
+        response_format: BaseResponseFormat[PassageT, OutputT] | None = None,
+    ) -> list[list[dict[str, str]]]:
+        return [
+            self.build_messages(passages, response_format)
+            for passages in passages_batch
+        ]
+
     def validate_passages(self, passages: PassageT) -> PassageT:
         return passages
 
@@ -203,6 +213,36 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
 
         return dataset
 
+    def build_batch_dataset(
+        self,
+        passages_batch: list[PassageT],
+        runtime: ModelRuntime,
+    ) -> list[AlpacaDataset]:
+        dataset = []
+        response_formats: list[BaseResponseFormat[PassageT, OutputT] | None]
+        if self.response_formats:
+            response_formats = list(self.response_formats)
+        else:
+            response_formats = [None]
+
+        for response_format in response_formats:
+            outputs = runtime.generate_structured_batch(
+                self.build_messages_batch(passages_batch, response_format),
+                self.schema,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+            dataset.extend(
+                self._build_batch_rows_from_outputs(
+                    passages_batch,
+                    outputs,
+                    response_format,
+                    runtime,
+                )
+            )
+
+        return dataset
+
     async def abuild_dataset(
         self,
         passages: PassageT,
@@ -231,6 +271,36 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
 
         return dataset
 
+    async def abuild_batch_dataset(
+        self,
+        passages_batch: list[PassageT],
+        runtime: ModelRuntime,
+    ) -> list[AlpacaDataset]:
+        dataset = []
+        response_formats: list[BaseResponseFormat[PassageT, OutputT] | None]
+        if self.response_formats:
+            response_formats = list(self.response_formats)
+        else:
+            response_formats = [None]
+
+        for response_format in response_formats:
+            outputs = await runtime.agenerate_structured_batch(
+                self.build_messages_batch(passages_batch, response_format),
+                self.schema,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+            dataset.extend(
+                await self._abuild_batch_rows_from_outputs(
+                    passages_batch,
+                    outputs,
+                    response_format,
+                    runtime,
+                )
+            )
+
+        return dataset
+
     async def _abuild_dataset_for_response_format(
         self,
         passages: PassageT,
@@ -248,6 +318,72 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
                     response_format,
                 )
             )
+
+        return dataset
+
+    def _build_batch_rows_from_outputs(
+        self,
+        passages_batch: list[PassageT],
+        outputs: list[OutputT],
+        response_format: BaseResponseFormat[PassageT, OutputT] | None,
+        runtime: ModelRuntime,
+    ) -> list[AlpacaDataset]:
+        dataset = []
+
+        for passages, output in zip(passages_batch, outputs):
+            output_chain = [output]
+            for _ in range(self.variations):
+                output_chain.append(
+                    runtime.generate_variation(
+                        output,
+                        self.schema,
+                        context=self.variation_context,
+                        temperature=self.variation_temperature,
+                        max_tokens=self.variation_max_tokens,
+                    )
+                )
+
+            for chained_output in output_chain:
+                dataset.extend(
+                    self.build_dataset_from_output(
+                        passages,
+                        chained_output,
+                        response_format,
+                    )
+                )
+
+        return dataset
+
+    async def _abuild_batch_rows_from_outputs(
+        self,
+        passages_batch: list[PassageT],
+        outputs: list[OutputT],
+        response_format: BaseResponseFormat[PassageT, OutputT] | None,
+        runtime: ModelRuntime,
+    ) -> list[AlpacaDataset]:
+        dataset = []
+
+        for passages, output in zip(passages_batch, outputs):
+            output_chain = [output]
+            for _ in range(self.variations):
+                output_chain.append(
+                    await runtime.agenerate_variation(
+                        output,
+                        self.schema,
+                        context=self.variation_context,
+                        temperature=self.variation_temperature,
+                        max_tokens=self.variation_max_tokens,
+                    )
+                )
+
+            for chained_output in output_chain:
+                dataset.extend(
+                    self.build_dataset_from_output(
+                        passages,
+                        chained_output,
+                        response_format,
+                    )
+                )
 
         return dataset
 
