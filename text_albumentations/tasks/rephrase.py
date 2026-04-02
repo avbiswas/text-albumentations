@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from text_albumentations.base import BaseSingleChunkAugmentation
 from text_albumentations.output_format_adapters import BaseAlpacaAdapter
@@ -32,6 +32,27 @@ class RephraseAugmentation(BaseSingleChunkAugmentation[Rewritten]):
     system_prompt = SYSTEM_PROMPT
     adapters = (RephraseAdapter(),)
     temperature = 0.5
+
+    def __init__(
+        self,
+        *,
+        max_rephrased_length: int = 1000,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.max_rephrased_length = max_rephrased_length
+        self._configured_schema: type[Rewritten] | None = None
+
+    def get_schema(self) -> type[Rewritten]:
+        if self.max_rephrased_length == 1000:
+            return self.schema
+        if self._configured_schema is None:
+            self._configured_schema = create_model(
+                "ConfiguredRewritten",
+                rephrased=(str, Field(max_length=self.max_rephrased_length)),
+                __base__=BaseModel,
+            )
+        return self._configured_schema
 
 
 rephrase_augmentation = RephraseAugmentation()

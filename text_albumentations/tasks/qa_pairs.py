@@ -1,6 +1,6 @@
 import json
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from text_albumentations.base import BaseSingleChunkAugmentation
 from text_albumentations.output_format_adapters import BaseAlpacaAdapter
@@ -205,6 +205,27 @@ class QaPairAugmentation(BaseSingleChunkAugmentation[QAList]):
             ),
         ),
     )
+
+    def __init__(
+        self,
+        *,
+        max_qa_pairs: int = 3,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.max_qa_pairs = max_qa_pairs
+        self._configured_schema: type[QAList] | None = None
+
+    def get_schema(self) -> type[QAList]:
+        if self.max_qa_pairs == 3:
+            return self.schema
+        if self._configured_schema is None:
+            self._configured_schema = create_model(
+                "ConfiguredQAList",
+                qa_pairs=(list[QA], Field(..., min_length=1, max_length=self.max_qa_pairs)),
+                __base__=BaseModel,
+            )
+        return self._configured_schema
 
 
 qa_pair_augmentation = QaPairAugmentation()

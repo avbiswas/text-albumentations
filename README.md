@@ -61,15 +61,17 @@ The project currently supports:
 - long-text ingestion with fixed-size character chunking
 - JSONL dataset writing
 
-Built-in augmentation families include:
+Built-in augmentations:
 
-- bullets
-- QA pairs
-- rephrase
-- continuation
-- retrieval
-- comparison
-- triplets
+| Augmentation | Type | What it generates |
+| --- | --- | --- |
+| `bullets` | Single chunk | Extracts key points from a passage and renders them as bullet-style outputs. |
+| `qa_pairs` | Single chunk | Produces question-answer pairs grounded in one passage. |
+| `rephrase` | Single chunk | Rewrites a passage into a clearer or more elaborated version without changing meaning. |
+| `continuation` | Single chunk | Produces continuation-style completions derived from the passage. |
+| `triplets` | Single chunk | Extracts subject-relation-object knowledge graph triplets. |
+| `comparison` | Multi chunk | Compares two passages and generates a structured comparison. |
+| `retrieval` | Multi chunk | Builds retrieval-style supervision by pairing questions with the passage that answers them, or with no-answer cases. |
 
 ## Architecture
 

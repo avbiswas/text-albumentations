@@ -1,6 +1,6 @@
 import json
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from text_albumentations.base import BaseSingleChunkAugmentation
 from text_albumentations.output_format_adapters import BaseAlpacaAdapter
@@ -97,6 +97,48 @@ class TripletAugmentation(BaseSingleChunkAugmentation[TripletList]):
         ),
     )
     temperature = 0.2
+
+    def __init__(
+        self,
+        *,
+        max_triplets: int = 2,
+        max_subject_length: int = 120,
+        max_relation_length: int = 120,
+        max_object_length: int = 160,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.max_triplets = max_triplets
+        self.max_subject_length = max_subject_length
+        self.max_relation_length = max_relation_length
+        self.max_object_length = max_object_length
+        self._configured_schema: type[TripletList] | None = None
+
+    def get_schema(self) -> type[TripletList]:
+        if (
+            self.max_triplets == 2
+            and self.max_subject_length == 120
+            and self.max_relation_length == 120
+            and self.max_object_length == 160
+        ):
+            return self.schema
+        if self._configured_schema is None:
+            configured_triplet = create_model(
+                "ConfiguredTriplet",
+                subject=(str, Field(..., max_length=self.max_subject_length)),
+                relation=(str, Field(..., max_length=self.max_relation_length)),
+                object=(str, Field(..., max_length=self.max_object_length)),
+                __base__=BaseModel,
+            )
+            self._configured_schema = create_model(
+                "ConfiguredTripletList",
+                triplets=(
+                    list[configured_triplet],
+                    Field(..., min_length=1, max_length=self.max_triplets),
+                ),
+                __base__=BaseModel,
+            )
+        return self._configured_schema
 
 
 triplet_augmentation = TripletAugmentation()

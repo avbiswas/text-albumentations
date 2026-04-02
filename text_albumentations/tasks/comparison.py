@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from text_albumentations.base import BaseMultiChunkAugmentation
 from text_albumentations.output_format_adapters import BaseAlpacaAdapter
@@ -44,6 +44,27 @@ class ComparisonAugmentation(BaseMultiChunkAugmentation[Comparisons]):
     temperature = 0.5
     num_generations = 3
     min_passages = 2
+
+    def __init__(
+        self,
+        *,
+        max_answer_length: int = 500,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.max_answer_length = max_answer_length
+        self._configured_schema: type[Comparisons] | None = None
+
+    def get_schema(self) -> type[Comparisons]:
+        if self.max_answer_length == 500:
+            return self.schema
+        if self._configured_schema is None:
+            self._configured_schema = create_model(
+                "ConfiguredComparisons",
+                answer=(str, Field(max_length=self.max_answer_length)),
+                __base__=BaseModel,
+            )
+        return self._configured_schema
 
     def validate_passages(self, passages: list[str]) -> list[str]:
         cleaned_passages = super().validate_passages(passages)

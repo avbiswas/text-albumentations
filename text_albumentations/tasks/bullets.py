@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from text_albumentations.base import BaseSingleChunkAugmentation
 from text_albumentations.output_format_adapters import BaseAlpacaAdapter
@@ -82,6 +82,27 @@ class BulletAugmentation(BaseSingleChunkAugmentation[BulletList]):
     )
     temperature = 0.2
     variations = 1
+
+    def __init__(
+        self,
+        *,
+        max_bullets: int = 6,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.max_bullets = max_bullets
+        self._configured_schema: type[BulletList] | None = None
+
+    def get_schema(self) -> type[BulletList]:
+        if self.max_bullets == 6:
+            return self.schema
+        if self._configured_schema is None:
+            self._configured_schema = create_model(
+                "ConfiguredBulletList",
+                bullets=(list[str], Field(..., min_length=1, max_length=self.max_bullets)),
+                __base__=BaseModel,
+            )
+        return self._configured_schema
 
 
 bullet_augmentation = BulletAugmentation()

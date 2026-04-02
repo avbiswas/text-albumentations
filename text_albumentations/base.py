@@ -64,6 +64,9 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
     def build_user_message(self, passages: PassageT) -> str:
         raise NotImplementedError
 
+    def get_schema(self) -> type[OutputT]:
+        return self.schema
+
     def build_messages(
         self,
         passages: PassageT,
@@ -97,9 +100,10 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
         response_format: BaseResponseFormat[PassageT, OutputT] | None = None,
     ) -> OutputT:
+        schema = self.get_schema()
         return runtime.generate_structured(
             self.build_messages(passages, response_format),
-            self.schema,
+            schema,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
@@ -110,9 +114,10 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
         response_format: BaseResponseFormat[PassageT, OutputT] | None = None,
     ) -> OutputT:
+        schema = self.get_schema()
         return await runtime.agenerate_structured(
             self.build_messages(passages, response_format),
-            self.schema,
+            schema,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
@@ -124,6 +129,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         response_format: BaseResponseFormat[PassageT, OutputT] | None = None,
     ) -> list[OutputT]:
         outputs = []
+        schema = self.get_schema()
 
         for _ in range(self.num_generations):
             base_output = self.generate_one(passages, runtime, response_format)
@@ -133,7 +139,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
                 outputs.append(
                     runtime.generate_variation(
                         base_output,
-                        self.schema,
+                        schema,
                         context=self.variation_context,
                         temperature=self.variation_temperature,
                         max_tokens=self.variation_max_tokens,
@@ -148,6 +154,8 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
         response_format: BaseResponseFormat[PassageT, OutputT] | None = None,
     ) -> list[OutputT]:
+        schema = self.get_schema()
+
         async def generate_output_chain() -> list[OutputT]:
             chain_outputs = []
             base_output = await self.agenerate_one(passages, runtime, response_format)
@@ -157,7 +165,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
                 chain_outputs.append(
                     await runtime.agenerate_variation(
                         base_output,
-                        self.schema,
+                        schema,
                         context=self.variation_context,
                         temperature=self.variation_temperature,
                         max_tokens=self.variation_max_tokens,
@@ -195,6 +203,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
         dataset = []
+        schema = self.get_schema()
         response_formats: list[BaseResponseFormat[PassageT, OutputT] | None]
         if self.response_formats:
             response_formats = list(self.response_formats)
@@ -228,7 +237,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         for response_format in response_formats:
             outputs = runtime.generate_structured_batch(
                 self.build_messages_batch(passages_batch, response_format),
-                self.schema,
+                schema,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )
@@ -249,6 +258,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
         dataset = []
+        schema = self.get_schema()
         response_formats: list[BaseResponseFormat[PassageT, OutputT] | None]
         if self.response_formats:
             response_formats = list(self.response_formats)
@@ -286,7 +296,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         for response_format in response_formats:
             outputs = await runtime.agenerate_structured_batch(
                 self.build_messages_batch(passages_batch, response_format),
-                self.schema,
+                schema,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )
@@ -329,6 +339,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
         dataset = []
+        schema = self.get_schema()
 
         for passages, output in zip(passages_batch, outputs):
             output_chain = [output]
@@ -336,7 +347,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
                 output_chain.append(
                     runtime.generate_variation(
                         output,
-                        self.schema,
+                        schema,
                         context=self.variation_context,
                         temperature=self.variation_temperature,
                         max_tokens=self.variation_max_tokens,
@@ -362,6 +373,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
         dataset = []
+        schema = self.get_schema()
 
         for passages, output in zip(passages_batch, outputs):
             output_chain = [output]
@@ -369,7 +381,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
                 output_chain.append(
                     await runtime.agenerate_variation(
                         output,
-                        self.schema,
+                        schema,
                         context=self.variation_context,
                         temperature=self.variation_temperature,
                         max_tokens=self.variation_max_tokens,
