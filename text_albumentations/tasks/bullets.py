@@ -93,7 +93,7 @@ class BulletAugmentation(BaseSingleChunkAugmentation[BulletList]):
         self.max_bullets = max_bullets
         self._configured_schema: type[BulletList] | None = None
 
-    def get_schema(self) -> type[BulletList]:
+    def get_schema(self, passages: str | list[str] | None = None) -> type[BulletList]:
         if self.max_bullets == 6:
             return self.schema
         if self._configured_schema is None:

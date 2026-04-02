@@ -4,7 +4,7 @@ from text_albumentations.base import BaseSingleChunkAugmentation
 from text_albumentations.output_format_adapters import BaseAlpacaAdapter
 from text_albumentations.runner import run_augmentation
 from text_albumentations.runtime import get_default_outlines_runtime
-from text_albumentations.utils import AlpacaDataset
+from text_albumentations.utils import AlpacaDataset, estimate_max_length_from_words
 
 
 class Rewritten(BaseModel):
@@ -36,22 +36,33 @@ class RephraseAugmentation(BaseSingleChunkAugmentation[Rewritten]):
     def __init__(
         self,
         *,
-        max_rephrased_length: int = 1000,
+        max_rephrased_length: int | None = None,
+        rephrased_length_multiplier: float = 5.0,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.max_rephrased_length = max_rephrased_length
+        self.rephrased_length_multiplier = rephrased_length_multiplier
         self._configured_schema: type[Rewritten] | None = None
+        self._configured_schema_key: int | None = None
 
-    def get_schema(self) -> type[Rewritten]:
-        if self.max_rephrased_length == 1000:
+    def get_schema(self, passages: str | list[str] | None = None) -> type[Rewritten]:
+        max_rephrased_length = self.max_rephrased_length
+        if max_rephrased_length is None:
+            max_rephrased_length = estimate_max_length_from_words(
+                passages,
+                self.rephrased_length_multiplier,
+                minimum=1000,
+            )
+        if max_rephrased_length == 1000:
             return self.schema
-        if self._configured_schema is None:
+        if self._configured_schema is None or self._configured_schema_key != max_rephrased_length:
             self._configured_schema = create_model(
                 "ConfiguredRewritten",
-                rephrased=(str, Field(max_length=self.max_rephrased_length)),
+                rephrased=(str, Field(max_length=max_rephrased_length)),
                 __base__=BaseModel,
             )
+            self._configured_schema_key = max_rephrased_length
         return self._configured_schema
 
 

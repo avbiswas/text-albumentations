@@ -4,7 +4,7 @@ from text_albumentations.base import BaseMultiChunkAugmentation
 from text_albumentations.output_format_adapters import BaseAlpacaAdapter
 from text_albumentations.runner import run_augmentation
 from text_albumentations.runtime import get_default_outlines_runtime
-from text_albumentations.utils import AlpacaDataset
+from text_albumentations.utils import AlpacaDataset, estimate_max_length_from_words
 
 
 class Comparisons(BaseModel):
@@ -48,22 +48,33 @@ class ComparisonAugmentation(BaseMultiChunkAugmentation[Comparisons]):
     def __init__(
         self,
         *,
-        max_answer_length: int = 500,
+        max_answer_length: int | None = None,
+        answer_length_multiplier: float = 3.0,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.max_answer_length = max_answer_length
+        self.answer_length_multiplier = answer_length_multiplier
         self._configured_schema: type[Comparisons] | None = None
+        self._configured_schema_key: int | None = None
 
-    def get_schema(self) -> type[Comparisons]:
-        if self.max_answer_length == 500:
+    def get_schema(self, passages: list[str] | list[list[str]] | None = None) -> type[Comparisons]:
+        max_answer_length = self.max_answer_length
+        if max_answer_length is None:
+            max_answer_length = estimate_max_length_from_words(
+                passages,
+                self.answer_length_multiplier,
+                minimum=500,
+            )
+        if max_answer_length == 500:
             return self.schema
-        if self._configured_schema is None:
+        if self._configured_schema is None or self._configured_schema_key != max_answer_length:
             self._configured_schema = create_model(
                 "ConfiguredComparisons",
-                answer=(str, Field(max_length=self.max_answer_length)),
+                answer=(str, Field(max_length=max_answer_length)),
                 __base__=BaseModel,
             )
+            self._configured_schema_key = max_answer_length
         return self._configured_schema
 
     def validate_passages(self, passages: list[str]) -> list[str]:

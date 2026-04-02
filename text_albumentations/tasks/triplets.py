@@ -114,7 +114,7 @@ class TripletAugmentation(BaseSingleChunkAugmentation[TripletList]):
         self.max_object_length = max_object_length
         self._configured_schema: type[TripletList] | None = None
 
-    def get_schema(self) -> type[TripletList]:
+    def get_schema(self, passages: str | list[str] | None = None) -> type[TripletList]:
         if (
             self.max_triplets == 2
             and self.max_subject_length == 120

@@ -64,7 +64,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
     def build_user_message(self, passages: PassageT) -> str:
         raise NotImplementedError
 
-    def get_schema(self) -> type[OutputT]:
+    def get_schema(self, passages: PassageT | list[PassageT] | None = None) -> type[OutputT]:
         return self.schema
 
     def build_messages(
@@ -100,7 +100,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
         response_format: BaseResponseFormat[PassageT, OutputT] | None = None,
     ) -> OutputT:
-        schema = self.get_schema()
+        schema = self.get_schema(passages)
         return runtime.generate_structured(
             self.build_messages(passages, response_format),
             schema,
@@ -114,7 +114,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
         response_format: BaseResponseFormat[PassageT, OutputT] | None = None,
     ) -> OutputT:
-        schema = self.get_schema()
+        schema = self.get_schema(passages)
         return await runtime.agenerate_structured(
             self.build_messages(passages, response_format),
             schema,
@@ -129,7 +129,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         response_format: BaseResponseFormat[PassageT, OutputT] | None = None,
     ) -> list[OutputT]:
         outputs = []
-        schema = self.get_schema()
+        schema = self.get_schema(passages)
 
         for _ in range(self.num_generations):
             base_output = self.generate_one(passages, runtime, response_format)
@@ -154,7 +154,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
         response_format: BaseResponseFormat[PassageT, OutputT] | None = None,
     ) -> list[OutputT]:
-        schema = self.get_schema()
+        schema = self.get_schema(passages)
 
         async def generate_output_chain() -> list[OutputT]:
             chain_outputs = []
@@ -203,7 +203,6 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
         dataset = []
-        schema = self.get_schema()
         response_formats: list[BaseResponseFormat[PassageT, OutputT] | None]
         if self.response_formats:
             response_formats = list(self.response_formats)
@@ -228,6 +227,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
         dataset = []
+        schema = self.get_schema(passages_batch)
         response_formats: list[BaseResponseFormat[PassageT, OutputT] | None]
         if self.response_formats:
             response_formats = list(self.response_formats)
@@ -258,7 +258,6 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
         dataset = []
-        schema = self.get_schema()
         response_formats: list[BaseResponseFormat[PassageT, OutputT] | None]
         if self.response_formats:
             response_formats = list(self.response_formats)
@@ -339,7 +338,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
         dataset = []
-        schema = self.get_schema()
+        schema = self.get_schema(passages_batch)
 
         for passages, output in zip(passages_batch, outputs):
             output_chain = [output]
@@ -373,7 +372,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
         dataset = []
-        schema = self.get_schema()
+        schema = self.get_schema(passages_batch)
 
         for passages, output in zip(passages_batch, outputs):
             output_chain = [output]

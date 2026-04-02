@@ -7,7 +7,7 @@ from text_albumentations.output_format_adapters import BaseAlpacaAdapter
 from text_albumentations.response_formats import AlpacaResponseFormat
 from text_albumentations.runner import run_augmentation
 from text_albumentations.runtime import get_default_outlines_runtime
-from text_albumentations.utils import AlpacaDataset
+from text_albumentations.utils import AlpacaDataset, estimate_max_length_from_words
 
 
 class QA(BaseModel):
@@ -210,21 +210,62 @@ class QaPairAugmentation(BaseSingleChunkAugmentation[QAList]):
         self,
         *,
         max_qa_pairs: int = 3,
+        max_question_length: int | None = None,
+        max_answer_length: int | None = None,
+        qa_text_length_multiplier: float = 5.0,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.max_qa_pairs = max_qa_pairs
+        self.max_question_length = max_question_length
+        self.max_answer_length = max_answer_length
+        self.qa_text_length_multiplier = qa_text_length_multiplier
         self._configured_schema: type[QAList] | None = None
+        self._configured_schema_key: tuple[int, int, int] | None = None
 
-    def get_schema(self) -> type[QAList]:
-        if self.max_qa_pairs == 3:
+    def get_schema(self, passages: str | list[str] | None = None) -> type[QAList]:
+        max_question_length = self.max_question_length
+        if max_question_length is None:
+            max_question_length = estimate_max_length_from_words(
+                passages,
+                self.qa_text_length_multiplier,
+                minimum=300,
+            )
+
+        max_answer_length = self.max_answer_length
+        if max_answer_length is None:
+            max_answer_length = estimate_max_length_from_words(
+                passages,
+                self.qa_text_length_multiplier,
+                minimum=500,
+            )
+
+        if (
+            self.max_qa_pairs == 3
+            and max_question_length == 300
+            and max_answer_length == 500
+        ):
             return self.schema
-        if self._configured_schema is None:
-            self._configured_schema = create_model(
-                "ConfiguredQAList",
-                qa_pairs=(list[QA], Field(..., min_length=1, max_length=self.max_qa_pairs)),
+
+        schema_key = (
+            self.max_qa_pairs,
+            max_question_length,
+            max_answer_length,
+        )
+
+        if self._configured_schema is None or self._configured_schema_key != schema_key:
+            configured_qa = create_model(
+                "ConfiguredQA",
+                question=(str, Field(max_length=max_question_length)),
+                answer=(str, Field(max_length=max_answer_length)),
                 __base__=BaseModel,
             )
+            self._configured_schema = create_model(
+                "ConfiguredQAList",
+                qa_pairs=(list[configured_qa], Field(..., min_length=1, max_length=self.max_qa_pairs)),
+                __base__=BaseModel,
+            )
+            self._configured_schema_key = schema_key
         return self._configured_schema
 
 
