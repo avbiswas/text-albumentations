@@ -2,9 +2,17 @@
 
 `text-albumentations` is a synthetic data generation engine for text.
 
+PyPI: https://pypi.org/project/text-albumentations/
+
 The goal is to help generate instruction-tuning and distillation datasets from existing text corpora by applying structured augmentations over passages.
 
 This is built for the practical case where good supervised fine-tuning often requires more examples than you already have, and where synthetic data generation is one of the fastest ways to create task-shaped training data from raw documents.
+
+## Support
+
+If you find this helpful, consider supporting on Patreon — it hosts all code, projects, slides, and write-ups from the YouTube channel.
+
+[<img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" alt="Become a Patron!" width="200">](https://www.patreon.com/NeuralBreakdownwithAVB)
 
 ## Why This Exists
 
@@ -96,6 +104,14 @@ The main abstractions are:
   3. an augmentation
 
 ## Usage
+
+### Install
+
+```bash
+uv add text-albumentations
+```
+
+PyPI package: https://pypi.org/project/text-albumentations/
 
 ### Minimal Local Example
 
