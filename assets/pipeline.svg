@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" style="background:#0d1117;font-family:system-ui,-apple-system,sans-serif">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+      <stop offset="50%" stop-color="#8b5cf6" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.3"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Title -->
+  <text x="600" y="52" text-anchor="middle" fill="#e6edf3" font-size="26" font-weight="700" letter-spacing="-0.5">text-albumentations</text>
+  <text x="600" y="78" text-anchor="middle" fill="#8b949e" font-size="14">One passage → Auto-picked augmentations → Reasoning traces → Dataset</text>
+
+  <!-- ========== Step 1: Passage ========== -->
+  <rect x="30" y="120" width="220" height="100" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="140" y="152" text-anchor="middle" fill="#8b949e" font-size="11" letter-spacing="1">INPUT</text>
+  <text x="140" y="178" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Raw Passage</text>
+  <text x="140" y="200" text-anchor="middle" fill="#8b949e" font-size="11">string</text>
+
+  <!-- Arrow 1 -->
+  <line x1="250" y1="170" x2="310" y2="170" stroke="url(#g1)" stroke-width="2" marker-end="url(#arrow1)"/>
+  <defs><marker id="arrow1" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#3b82f6"/></marker></defs>
+
+  <!-- ========== Step 2: Quality Filter ========== -->
+  <rect x="315" y="108" width="240" height="124" rx="12" fill="#161b22" stroke="url(#g1)" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="435" y="140" text-anchor="middle" fill="#3b82f6" font-size="11" letter-spacing="1">STEP 1</text>
+  <text x="435" y="166" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Quality Filter</text>
+  <text x="435" y="188" text-anchor="middle" fill="#8b949e" font-size="11">LLM assesses passage quality</text>
+  <text x="435" y="208" text-anchor="middle" fill="#8b949e" font-size="11">Rejects: too short, nonsensical,</text>
+  <text x="435" y="224" text-anchor="middle" fill="#8b949e" font-size="11">boilerplate, metadata-only</text>
+
+  <!-- Arrow 2 -->
+  <line x1="555" y1="170" x2="615" y2="170" stroke="url(#g2)" stroke-width="2" marker-end="url(#arrow2)"/>
+  <defs><marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#8b5cf6"/></marker></defs>
+
+  <!-- ========== Step 3: Auto-Pick ========== -->
+  <rect x="620" y="108" width="240" height="124" rx="12" fill="#161b22" stroke="url(#g2)" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="740" y="140" text-anchor="middle" fill="#8b5cf6" font-size="11" letter-spacing="1">STEP 2</text>
+  <text x="740" y="166" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Auto-Pick</text>
+  <text x="740" y="188" text-anchor="middle" fill="#8b949e" font-size="11">LLM selects best augmentations</text>
+  <text x="740" y="208" text-anchor="middle" fill="#8b949e" font-size="11">from a provided list based on</text>
+  <text x="740" y="224" text-anchor="middle" fill="#8b949e" font-size="11">passage content &amp; structure</text>
+
+  <!-- Arrow 3 -->
+  <line x1="860" y1="170" x2="920" y2="170" stroke="#ec4899" stroke-width="2" marker-end="url(#arrow3)"/>
+  <defs><marker id="arrow3" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#ec4899"/></marker></defs>
+
+  <!-- ========== Step 4: Augmentations Run ========== -->
+  <rect x="925" y="100" width="250" height="140" rx="12" fill="#161b22" stroke="url(#g3)" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="132" text-anchor="middle" fill="#ec4899" font-size="11" letter-spacing="1">STEP 3</text>
+  <text x="1050" y="158" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Generate + Reason</text>
+  <text x="1050" y="182" text-anchor="middle" fill="#8b949e" font-size="11">Selected augmentations run</text>
+  <text x="1050" y="202" text-anchor="middle" fill="#8b949e" font-size="11">Structured output via Outlines</text>
+  <text x="1050" y="222" text-anchor="middle" fill="#8b949e" font-size="11">Reasoning traces per row</text>
+  <text x="1050" y="242" text-anchor="middle" fill="#8b949e" font-size="11">(chain-of-thought deduction)</text>
+
+  <!-- ========== Bottom section: Augmentation options ========== -->
+  <text x="600" y="300" text-anchor="middle" fill="#8b949e" font-size="12" letter-spacing="1">AVAILABLE AUGMENTATIONS</text>
+
+  <!-- Bullets -->
+  <rect x="50" y="320" width="200" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="150" y="348" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">● bullets</text>
+  <text x="150" y="370" text-anchor="middle" fill="#8b949e" font-size="11">Key point extraction</text>
+
+  <!-- QA Pairs -->
+  <rect x="270" y="320" width="200" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="370" y="348" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">↔ qa_pairs</text>
+  <text x="370" y="370" text-anchor="middle" fill="#8b949e" font-size="11">Question-answer pairs</text>
+
+  <!-- Rephrase -->
+  <rect x="490" y="320" width="200" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="590" y="348" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">↻ rephrase</text>
+  <text x="590" y="370" text-anchor="middle" fill="#8b949e" font-size="11">Rewrite &amp; elaboration</text>
+
+  <!-- Triplets -->
+  <rect x="710" y="320" width="200" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="810" y="348" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">◈ triplets</text>
+  <text x="810" y="370" text-anchor="middle" fill="#8b949e" font-size="11">Knowledge graph triplets</text>
+
+  <!-- Continuation -->
+  <rect x="930" y="320" width="220" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="1040" y="348" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">→ continuation</text>
+  <text x="1040" y="370" text-anchor="middle" fill="#8b949e" font-size="11">Prefix/suffix/middle slices</text>
+
+  <!-- ========== Bottom section: Output ========== -->
+  <rect x="50" y="420" width="1100" height="60" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="600" y="448" text-anchor="middle" fill="#8b949e" font-size="12" letter-spacing="1">OUTPUT: ALPACA-FORMAT DATASET</text>
+  <text x="600" y="470" text-anchor="middle" fill="#e6edf3" font-size="13" font-family="monospace">{ instruction, input, output, reasoning } · JSONL</text>
+
+  <!-- Bottom row: Runtimes -->
+  <text x="600" y="520" text-anchor="middle" fill="#8b949e" font-size="11" letter-spacing="1">RUNTIMES</text>
+  <rect x="80" y="536" width="150" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="155" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">OpenAI (sync/async)</text>
+
+  <rect x="250" y="536" width="170" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="335" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">Local server (OpenAI API)</text>
+
+  <rect x="440" y="536" width="130" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="505" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">MLX (Apple Silicon)</text>
+
+  <rect x="590" y="536" width="150" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="665" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">Transformers (HF)</text>
+
+  <rect x="760" y="536" width="170" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="845" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">Outlines (constrained)</text>
+
+  <rect x="950" y="536" width="200" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="1050" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">Extensible (ModelRuntime ABC)</text>
+
+  <!-- Footer -->
+  <text x="600" y="610" text-anchor="middle" fill="#30363d" font-size="10">text-albumentations · pypi.org/project/text-albumentations</text>
+</svg>

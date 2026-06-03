@@ -4,6 +4,7 @@ class AlpacaDataset(BaseModel):
     instruction: str
     input: str
     output: str
+    reasoning: str | None = None
 
 
 def count_words(value) -> int:

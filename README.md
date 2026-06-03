@@ -35,7 +35,6 @@ If you already have long amounts of text, you can usually derive many useful sup
 
 Instead of treating synthetic data generation as one giant prompt, this project breaks it into explicit, composable pieces.
 
-
 ## Ideology
 
 The core idea is:
@@ -57,6 +56,9 @@ That combination is easier to reason about than unstructured free-form prompting
 
 The project currently supports:
 
+- **auto-pick**: LLM-driven selection of which augmentations fit a given passage
+- **quality filter**: automatic rejection of low-quality passages before generation
+- **reasoning traces**: post-hoc CoT reasoning generated for each training row
 - single-chunk augmentations
 - multi-chunk augmentations
 - batched augmentation execution for many passages with one shared schema
@@ -64,8 +66,9 @@ The project currently supports:
 - Alpaca-format dataset generation
 - response-format control for the Alpaca `output` field
 - sync and async generation runtimes
-- Outlines-backed local models
-- Outlines-backed OpenAI models
+- Outlines-backed local models (MLX, Transformers)
+- Outlines-backed OpenAI models (sync and async)
+- OpenAI-compatible local servers (e.g. MLX server on localhost)
 - long-text ingestion with fixed-size character chunking
 - JSONL dataset writing
 
@@ -95,13 +98,13 @@ The main abstractions are:
   This converts typed structured outputs into Alpaca rows.
 
 - `ModelRuntime`
-  This is the model execution interface. Current implementations support local Outlines models and OpenAI-through-Outlines models.
+  This is the model execution interface. Current implementations support local Outlines models, OpenAI-through-Outlines models, and OpenAI-compatible local servers.
 
 - `AugmentationRunner`
-  This binds together:
-  1. input data
-  2. a runtime
-  3. an augmentation
+  This binds together: input data, a runtime, and an augmentation.
+
+- `MetaAugmentation`
+  Auto-picks which augmentations to apply and filters low-quality passages.
 
 ## Usage
 
@@ -113,21 +116,32 @@ uv add text-albumentations
 
 PyPI package: https://pypi.org/project/text-albumentations/
 
-### Minimal Local Example
+### Recommended: Auto-Pick With Quality Filter
+
+The recommended way to generate datasets is `apply_best_augmentations`. It uses an LLM to automatically select which augmentations fit your passage and filters out low-quality input.
 
 ```python
-import mlx_lm
+import openai
 import outlines
 
-from text_albumentations import OutlinesModel, run_augmentation
-from text_albumentations.tasks.bullets import bullet_augmentation
+from text_albumentations import OutlinesModel, apply_best_augmentations
+from text_albumentations.tasks.bullets import BulletAugmentation
+from text_albumentations.tasks.qa_pairs import QaPairAugmentation
+from text_albumentations.tasks.rephrase import RephraseAugmentation
+from text_albumentations.tasks.triplets import TripletAugmentation
 
-model = outlines.from_mlxlm(*mlx_lm.load("mlx-community/Qwen3.5-4B-OptiQ-4bit"))
-runtime = OutlinesModel(model=model)
+model = outlines.from_openai(openai.OpenAI(), "gpt-4o-mini")
+runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
 
-rows = run_augmentation(
-    "The Transformer replaces recurrence with attention and improves parallelization.",
-    bullet_augmentation,
+rows = apply_best_augmentations(
+    "The Transformer replaces recurrence with attention and improves parallelization. "
+    "It achieved 28.4 BLEU on WMT 2014 English-to-German.",
+    [
+        ("bullets", BulletAugmentation(), "Extract key points as bullet points"),
+        ("qa_pairs", QaPairAugmentation(), "Generate question-answer pairs"),
+        ("rephrase", RephraseAugmentation(), "Rephrase and elaborate the passage"),
+        ("triplets", TripletAugmentation(), "Extract knowledge graph triplets"),
+    ],
     runtime,
 )
 
@@ -135,96 +149,113 @@ for row in rows:
     print(row.model_dump_json())
 ```
 
-See [`examples/minimal.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/minimal.py).
+The LLM first assesses passage quality (rejecting too-short, nonsensical, or boilerplate text), then selects only the augmentations that are well-suited to the passage's content and structure.
 
-### OpenAI Sync
+#### With Reasoning Traces
+
+Add `add_reasoning=True` to generate a Chain-of-Thought reasoning trace for every training row:
 
 ```python
-import openai
-import outlines
-
-from text_albumentations import OutlinesModel, run_augmentation
-from text_albumentations.tasks.bullets import bullet_augmentation
-
-model = outlines.from_openai(openai.OpenAI(), "gpt-5.4-nano")
-runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
-
-rows = run_augmentation("some passage", bullet_augmentation, runtime)
+rows = apply_best_augmentations(
+    passage,
+    augmentations,
+    runtime,
+    enable_quality_filter=True,
+    add_reasoning=True,
+)
 ```
 
-See [`examples/openai_sync.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/openai_sync.py).
+Each output row gets a `reasoning` field containing a step-by-step logical trace explaining how the response was derived from the passage and instruction.
 
-### OpenAI Async
+#### Auto-Pick With Async
 
 ```python
 import asyncio
 import openai
 import outlines
 
-from text_albumentations import OutlinesModel, arun_augmentation
-from text_albumentations.tasks.bullets import bullet_augmentation
-
+from text_albumentations import OutlinesModel, aapply_best_augmentations
+from text_albumentations.tasks.bullets import BulletAugmentation
+from text_albumentations.tasks.qa_pairs import QaPairAugmentation
 
 async def main():
-    model = outlines.from_openai(openai.AsyncOpenAI(), "gpt-5.4-nano")
-    runtime = OutlinesModel(
-        model,
-        async_mode=True,
-        total_concurrent_calls=4,
-        max_tokens_parameter="max_completion_tokens",
-    )
+    model = outlines.from_openai(openai.AsyncOpenAI(), "gpt-4o-mini")
+    runtime = OutlinesModel(model, async_mode=True, total_concurrent_calls=4,
+                            max_tokens_parameter="max_completion_tokens")
 
-    rows = await arun_augmentation("some passage", bullet_augmentation, runtime)
+    rows = await aapply_best_augmentations(passage, augmentations, runtime)
     print(len(rows))
-
 
 asyncio.run(main())
 ```
 
-See [`examples/openai_async.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/openai_async.py).
+### Runtime Setup
 
-### Transformers Local Model
+Pick the backend that fits your setup:
 
+**OpenAI (sync)**
 ```python
-import outlines
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-from text_albumentations import OutlinesModel, run_augmentation
-from text_albumentations.tasks.bullets import bullet_augmentation
-
-hf_model = AutoModelForCausalLM.from_pretrained(
-    "google/gemma-3-1b-it",
-    torch_dtype="auto",
-    device_map="auto",
-)
-hf_tokenizer = AutoTokenizer.from_pretrained("google/gemma-3-1b-it")
-
-model = outlines.from_transformers(hf_model, hf_tokenizer)
-runtime = OutlinesModel(model, max_tokens_parameter="max_new_tokens")
-
-rows = run_augmentation("some passage", bullet_augmentation, runtime)
+model = outlines.from_openai(openai.OpenAI(), "gpt-4o-mini")
+runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
 ```
 
-See the `examples/` directory for the current Transformers examples.
+**OpenAI (async)**
+```python
+model = outlines.from_openai(openai.AsyncOpenAI(), "gpt-4o-mini")
+runtime = OutlinesModel(model, async_mode=True, total_concurrent_calls=4,
+                        max_tokens_parameter="max_completion_tokens")
+```
+
+**OpenAI-compatible local server**
+```python
+client = openai.OpenAI(base_url="http://localhost:8080/v1", api_key="not-needed")
+model = outlines.from_openai(client, "mlx-community/Qwen3.5-4B-MLX-4bit")
+runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
+```
+
+**MLX local model**
+```python
+import mlx_lm
+model = outlines.from_mlxlm(*mlx_lm.load("mlx-community/Qwen3.5-4B-OptiQ-4bit"))
+runtime = OutlinesModel(model=model)
+```
+
+**Transformers local model**
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+hf_model = AutoModelForCausalLM.from_pretrained("google/gemma-3-1b-it",
+                                                 torch_dtype="auto", device_map="auto")
+hf_tokenizer = AutoTokenizer.from_pretrained("google/gemma-3-1b-it")
+model = outlines.from_transformers(hf_model, hf_tokenizer)
+runtime = OutlinesModel(model, max_tokens_parameter="max_new_tokens")
+```
+
+### Reasoning Traces (Standalone)
+
+You can add reasoning traces to any existing dataset, even if you didn't generate them with `add_reasoning=True`:
+
+```python
+from text_albumentations.reasoning import add_reasoning_to_dataset
+
+rows = run_augmentation(passage, bullet_augmentation, runtime)
+rows_with_reasoning = add_reasoning_to_dataset(passage, rows, runtime)
+```
+
+Each row gets a `reasoning` field with a Chain-of-Thought trace. Available functions:
+
+| Function | Description |
+| --- | --- |
+| `generate_reasoning(passage, row, runtime)` | Add reasoning to a single row |
+| `add_reasoning_to_dataset(passage, dataset, runtime)` | Add reasoning to all rows |
+| `agenerate_reasoning(...)` / `aadd_reasoning_to_dataset(...)` | Async variants |
 
 ### Batch Augmentation Over Multiple Passages
 
 ```python
-import outlines
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
 from text_albumentations import OutlinesModel, run_batch_augmentation
 from text_albumentations.tasks.bullets import BulletAugmentation
 
-hf_model = AutoModelForCausalLM.from_pretrained(
-    "google/gemma-3-1b-it",
-    torch_dtype="auto",
-    device_map="auto",
-)
-hf_tokenizer = AutoTokenizer.from_pretrained("google/gemma-3-1b-it")
-
-model = outlines.from_transformers(hf_model, hf_tokenizer)
-runtime = OutlinesModel(model, max_tokens_parameter="max_new_tokens")
 augmentation = BulletAugmentation(max_tokens=128, variations=0)
 
 rows = run_batch_augmentation(
@@ -239,19 +270,11 @@ rows = run_batch_augmentation(
 )
 ```
 
-See [`examples/batch_augmentation.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/batch_augmentation.py).
-
 ### Long Text To JSONL
 
 ```python
-import openai
-import outlines
-
 from text_albumentations import OutlinesModel, save_long_text_dataset
 from text_albumentations.tasks.bullets import bullet_augmentation
-
-model = outlines.from_openai(openai.OpenAI(), "gpt-5.4-nano")
-runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
 
 save_long_text_dataset(
     text=long_text,
@@ -262,29 +285,52 @@ save_long_text_dataset(
 )
 ```
 
-See [`examples/long_text_to_jsonl.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/long_text_to_jsonl.py).
+### Advanced: Manual Augmentation Selection
 
-### Multiple Augmentations Over The Same Passage
+If you want precise control over which augmentations run, use `run_augmentation` directly with individual augmentation instances.
 
 ```python
-import openai
-import outlines
-
 from text_albumentations import OutlinesModel, run_augmentation
+from text_albumentations.tasks.bullets import BulletAugmentation
+
+rows = run_augmentation(passage, BulletAugmentation(max_bullets=4, variations=2), runtime)
+```
+
+#### Multiple Augmentations Over The Same Passage
+
+```python
 from text_albumentations.tasks.bullets import bullet_augmentation
 from text_albumentations.tasks.rephrase import rephrase_augmentation
-
-model = outlines.from_openai(openai.OpenAI(), "gpt-5.4-nano")
-runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
 
 rows = []
 rows.extend(run_augmentation("some passage", bullet_augmentation, runtime))
 rows.extend(run_augmentation("some passage", rephrase_augmentation, runtime))
 ```
 
-See [`examples/multiple_augmentations.py`](/Users/avishekbiswas/Projects/text-albumentations/examples/multiple_augmentations.py).
+#### Augmentation Knobs
 
-### Custom Preprocessing Model
+Every augmentation accepts these parameters to control generation behavior:
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `temperature` | 0.2 | Sampling temperature for base generation |
+| `max_tokens` | 5000 | Max tokens for base generation |
+| `num_generations` | 1 | Number of independent base generations |
+| `variations` | varies | Number of variations per base generation (uses higher `variation_temperature`) |
+| `variation_temperature` | 0.5 | Temperature used for variation generation |
+
+Customize per-augmentation parameters:
+
+```python
+aug = BulletAugmentation(
+    max_bullets=4,
+    temperature=0.3,
+    variations=3,
+    variation_temperature=0.7,
+)
+```
+
+#### Custom Preprocessing Model
 
 You can also make the augmentation input itself be a custom Pydantic model instead of a raw string.
 
