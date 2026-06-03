@@ -16,14 +16,14 @@
   <path d="M0 420 C200 460, 400 420, 600 380 C800 340, 1000 400, 1200 360" stroke="url(#flowGrad)" stroke-width="100" fill="none" opacity="0.02" filter="url(#glow)"/>
 
   <!-- === TITLE === -->
-  <text x="600" y="50" text-anchor="middle" fill="#0f172a" font-size="32" font-weight="800" letter-spacing="-0.5">text-albumentations</text>
+  <text x="600" y="50" text-anchor="middle" fill="#0f172a" font-size="38" font-weight="800" letter-spacing="-0.5">text-albumentations</text>
 
   <!-- === PASSAGE (left) - document icons === -->
   <g filter="url(#softShadow)">
     <rect x="30" y="215" width="170" height="115" rx="24" fill="#fff" stroke="#e0e7ff" stroke-width="2"/>
     <rect x="30" y="215" width="170" height="115" rx="24" fill="url(#flowGrad)" opacity="0.04"/>
   </g>
-  <text x="115" y="248" text-anchor="middle" fill="#4f46e5" font-size="10" font-weight="700" letter-spacing="2">DOCUMENTS</text>
+  <text x="115" y="248" text-anchor="middle" fill="#4f46e5" font-size="12" font-weight="700" letter-spacing="2">DOCUMENTS</text>
 
   <!-- Document icons centered in the box -->
   <!-- Row 1 -->
@@ -55,16 +55,16 @@
 
   <!-- === QUALITY GATE === -->
   <path d="M200 272 C250 272, 250 190, 300 170" stroke="#dc2626" stroke-width="1.5" fill="none" stroke-dasharray="5 4" opacity="0.5"/>
-  <rect x="260" y="140" width="140" height="34" rx="17" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
-  <text x="330" y="161" text-anchor="middle" fill="#dc2626" font-size="10" font-weight="600">LOW QUALITY → REJECT</text>
+  <rect x="228" y="138" width="204" height="38" rx="19" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+  <text x="330" y="163" text-anchor="middle" fill="#dc2626" font-size="14" font-weight="600">LOW QUALITY → REJECT</text>
 
   <path d="M200 272 C280 272, 280 272, 320 272" stroke="#4f46e5" stroke-width="2.5" fill="none" marker-end="url(#arrowE)"/>
   <defs><marker id="arrowE" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto"><circle cx="3" cy="3" r="3" fill="#4f46e5"/></marker></defs>
 
   <!-- Quality gate pill -->
   <rect x="305" y="249" width="100" height="46" rx="23" fill="#fff" stroke="#e0e7ff" stroke-width="1.5" filter="url(#cardShadow)"/>
-  <text x="355" y="269" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700">QUALITY</text>
-  <text x="355" y="283" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700">GATE ✓</text>
+  <text x="355" y="269" text-anchor="middle" fill="#7c3aed" font-size="12" font-weight="700">QUALITY</text>
+  <text x="355" y="283" text-anchor="middle" fill="#7c3aed" font-size="12" font-weight="700">GATE ✓</text>
 
   <!-- === SMART SWITCH === -->
   <path d="M405 272 C460 272, 460 272, 500 272" stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#arrowP)"/>
@@ -74,8 +74,8 @@
     <rect x="485" y="244" width="100" height="56" rx="20" fill="#fff" stroke="#7c3aed" stroke-width="2"/>
     <rect x="485" y="244" width="100" height="56" rx="20" fill="url(#flowGrad)" opacity="0.06"/>
   </g>
-  <text x="535" y="270" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" letter-spacing="1.5">SMART</text>
-  <text x="535" y="286" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" letter-spacing="1.5">SWITCH</text>
+  <text x="535" y="270" text-anchor="middle" fill="#7c3aed" font-size="12" font-weight="700" letter-spacing="1.5">SMART</text>
+  <text x="535" y="286" text-anchor="middle" fill="#7c3aed" font-size="12" font-weight="700" letter-spacing="1.5">SWITCH</text>
 
   <!-- === FAN OUT === -->
   <path d="M585 272 C620 215, 630 140, 670 135" stroke="#818cf8" stroke-width="1.8" fill="none" opacity="0.5"/>
@@ -89,43 +89,43 @@
   <!-- Augmentation cards -->
   <rect x="660" y="112" width="200" height="44" rx="14" fill="#fff" stroke="#818cf8" stroke-width="1.2" filter="url(#cardShadow)"/>
   <circle cx="680" cy="134" r="4" fill="#818cf8"/>
-  <text x="692" y="130" fill="#4f46e5" font-size="12" font-weight="600">● Bullets</text>
-  <text x="692" y="146" fill="#94a3b8" font-size="10">Key point extraction</text>
+  <text x="692" y="130" fill="#4f46e5" font-size="14" font-weight="600">● Bullets</text>
+  <text x="692" y="146" fill="#94a3b8" font-size="12">Key point extraction</text>
 
   <rect x="660" y="178" width="200" height="44" rx="14" fill="#fff" stroke="#a78bfa" stroke-width="1.2" filter="url(#cardShadow)"/>
   <circle cx="680" cy="200" r="4" fill="#a78bfa"/>
-  <text x="692" y="196" fill="#7c3aed" font-size="12" font-weight="600">↔ QA Pairs</text>
-  <text x="692" y="212" fill="#94a3b8" font-size="10">Question-answer pairs</text>
+  <text x="692" y="196" fill="#7c3aed" font-size="14" font-weight="600">↔ QA Pairs</text>
+  <text x="692" y="212" fill="#94a3b8" font-size="12">Question-answer pairs</text>
 
   <rect x="660" y="244" width="200" height="44" rx="14" fill="#fff" stroke="#c084fc" stroke-width="1.2" filter="url(#cardShadow)"/>
   <circle cx="680" cy="266" r="4" fill="#c084fc"/>
-  <text x="692" y="262" fill="#9333ea" font-size="12" font-weight="600">↻ Rephrase</text>
-  <text x="692" y="278" fill="#94a3b8" font-size="10">Elaborated rewrite</text>
+  <text x="692" y="262" fill="#9333ea" font-size="14" font-weight="600">↻ Rephrase</text>
+  <text x="692" y="278" fill="#94a3b8" font-size="12">Elaborated rewrite</text>
 
   <rect x="660" y="310" width="200" height="44" rx="14" fill="#fff" stroke="#e879f9" stroke-width="1.2" filter="url(#cardShadow)"/>
   <circle cx="680" cy="332" r="4" fill="#e879f9"/>
-  <text x="692" y="328" fill="#c026d3" font-size="12" font-weight="600">◈ Triplets</text>
-  <text x="692" y="344" fill="#94a3b8" font-size="10">Knowledge graph</text>
+  <text x="692" y="328" fill="#c026d3" font-size="14" font-weight="600">◈ Triplets</text>
+  <text x="692" y="344" fill="#94a3b8" font-size="12">Knowledge graph</text>
 
   <rect x="660" y="376" width="200" height="44" rx="14" fill="#fff" stroke="#f472b6" stroke-width="1.2" filter="url(#cardShadow)"/>
   <circle cx="680" cy="398" r="4" fill="#f472b6"/>
-  <text x="692" y="394" fill="#db2777" font-size="12" font-weight="600">→ Continuation</text>
-  <text x="692" y="410" fill="#94a3b8" font-size="10">Prefix / suffix slices</text>
+  <text x="692" y="394" fill="#db2777" font-size="14" font-weight="600">→ Continuation</text>
+  <text x="692" y="410" fill="#94a3b8" font-size="12">Prefix / suffix slices</text>
 
   <rect x="660" y="442" width="200" height="44" rx="14" fill="#fff" stroke="#fb923c" stroke-width="1.2" filter="url(#cardShadow)"/>
   <circle cx="680" cy="464" r="4" fill="#fb923c"/>
-  <text x="692" y="460" fill="#ea580c" font-size="12" font-weight="600">⇔ Comparison</text>
-  <text x="692" y="476" fill="#94a3b8" font-size="10">Two-passage diff</text>
+  <text x="692" y="460" fill="#ea580c" font-size="14" font-weight="600">⇔ Comparison</text>
+  <text x="692" y="476" fill="#94a3b8" font-size="12">Two-passage diff</text>
 
   <rect x="660" y="508" width="200" height="44" rx="14" fill="#fff" stroke="#f59e0b" stroke-width="1.2" filter="url(#cardShadow)"/>
   <circle cx="680" cy="530" r="4" fill="#f59e0b"/>
-  <text x="692" y="526" fill="#d97706" font-size="12" font-weight="600">⌕ Retrieval</text>
-  <text x="692" y="542" fill="#94a3b8" font-size="10">Passage retrieval</text>
+  <text x="692" y="526" fill="#d97706" font-size="14" font-weight="600">⌕ Retrieval</text>
+  <text x="692" y="542" fill="#94a3b8" font-size="12">Passage retrieval</text>
 
   <!-- === REASONING tag === -->
   <path d="M585 272 C620 390, 630 560, 670 590" stroke="#10b981" stroke-width="1.8" fill="none" opacity="0.5"/>
   <rect x="660" y="574" width="200" height="36" rx="12" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1" filter="url(#cardShadow)"/>
-  <text x="760" y="597" text-anchor="middle" fill="#059669" font-size="11" font-weight="600">💭 Reasoning traces</text>
+  <text x="760" y="597" text-anchor="middle" fill="#059669" font-size="13" font-weight="600">💭 Reasoning traces</text>
 
   <!-- === CONVERGE to output === -->
   <path d="M860 134 C900 134, 910 190, 940 300" stroke="#818cf8" stroke-width="1" fill="none" opacity="0.3"/>
@@ -141,20 +141,20 @@
     <rect x="925" y="220" width="250" height="180" rx="22" fill="#fff" stroke="url(#flowGrad)" stroke-width="2"/>
     <rect x="925" y="220" width="250" height="180" rx="22" fill="url(#flowGrad)" opacity="0.04"/>
   </g>
-  <text x="1050" y="250" text-anchor="middle" fill="#475569" font-size="11" font-weight="700" letter-spacing="1.5">TRAINING ROWS</text>
+  <text x="1050" y="250" text-anchor="middle" fill="#475569" font-size="13" font-weight="700" letter-spacing="1.5">TRAINING ROWS</text>
 
   <!-- Fields vertical (left-aligned) -->
-  <rect x="945" y="266" width="84" height="24" rx="7" fill="#eef2ff"/>
-  <text x="953" y="282" fill="#4f46e5" font-size="10" font-weight="600" font-family="monospace">instruction</text>
+  <rect x="945" y="266" width="96" height="24" rx="7" fill="#eef2ff"/>
+  <text x="953" y="282" fill="#4f46e5" font-size="12" font-weight="600" font-family="monospace">instruction</text>
 
-  <rect x="945" y="296" width="48" height="24" rx="7" fill="#faf5ff"/>
-  <text x="953" y="312" fill="#7c3aed" font-size="10" font-weight="600" font-family="monospace">input</text>
+  <rect x="945" y="296" width="53" height="24" rx="7" fill="#faf5ff"/>
+  <text x="953" y="312" fill="#7c3aed" font-size="12" font-weight="600" font-family="monospace">input</text>
 
-  <rect x="945" y="326" width="54" height="24" rx="7" fill="#fdf2f8"/>
-  <text x="953" y="342" fill="#db2777" font-size="10" font-weight="600" font-family="monospace">output</text>
+  <rect x="945" y="326" width="60" height="24" rx="7" fill="#fdf2f8"/>
+  <text x="953" y="342" fill="#db2777" font-size="12" font-weight="600" font-family="monospace">output</text>
 
-  <rect x="945" y="356" width="72" height="24" rx="7" fill="#ecfdf5"/>
-  <text x="953" y="372" fill="#059669" font-size="10" font-weight="600" font-family="monospace">reasoning</text>
+  <rect x="945" y="356" width="82" height="24" rx="7" fill="#ecfdf5"/>
+  <text x="953" y="372" fill="#059669" font-size="12" font-weight="600" font-family="monospace">reasoning</text>
 
   <!-- Database icon (right of fields) -->
   <g transform="translate(1070, 282)">
