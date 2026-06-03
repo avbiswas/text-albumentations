@@ -1,16 +1,25 @@
 # text-albumentations
 
 `text-albumentations` is a synthetic data generation engine for text.
-
-PyPI: https://pypi.org/project/text-albumentations/
-
-![text-albumentations pipeline](assets/pipeline.svg)
-
 The goal is to help generate instruction-tuning and distillation datasets from existing text corpora by applying structured augmentations over passages.
 
 This is built for the practical case where good supervised fine-tuning often requires more examples than you already have, and where synthetic data generation is one of the fastest ways to create task-shaped training data from raw documents.
 
+![text-albumentations pipeline](assets/pipeline.svg)
+
+
+If you find this helpful, consider supporting on Patreon — it hosts all code, projects, slides, and write-ups from the YouTube channel.
+
+[<img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" alt="Become a Patron!" width="200">](https://www.patreon.com/NeuralBreakdownwithAVB)
+
 ## Quickstart
+
+Install via pip (or uv):
+```
+pip install text_albumentations
+```
+
+And use:
 
 ```python
 import text_albumentations as ta
@@ -63,11 +72,6 @@ rows = ta.augment(passage, tasks=[key_stat, "summarize"], model=model)
 
 The schema is enforced exactly via structured generation. `output=` also takes a callable, `rows=` gives full control over emitted rows, and generation knobs (`temperature=`, `variations=`, ...) pass straight through. Subclassing `BaseSingleChunkAugmentation` remains available for tasks that need custom input types or programmatic generation.
 
-## Support
-
-If you find this helpful, consider supporting on Patreon — it hosts all code, projects, slides, and write-ups from the YouTube channel.
-
-[<img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" alt="Become a Patron!" width="200">](https://www.patreon.com/NeuralBreakdownwithAVB)
 
 ## Why This Exists
 
