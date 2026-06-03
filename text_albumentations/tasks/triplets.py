@@ -79,6 +79,7 @@ class JsonTripletAdapter(BaseAlpacaAdapter[str, TripletList]):
 class TripletAugmentation(BaseSingleChunkAugmentation[TripletList]):
     schema = TripletList
     system_prompt = SYSTEM_PROMPT
+    selection_hint = "the passage states relationships between named entities or concepts."
     response_formats = (
         AlpacaResponseFormat(
             name="markdown",

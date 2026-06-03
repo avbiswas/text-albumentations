@@ -1,14 +1,6 @@
 # Demonstrates running multiple augmentations over the same passage and combining all generated rows.
 
-import openai
-import outlines
-
-from text_albumentations import OutlinesModel, run_augmentation
-from text_albumentations.tasks.bullets import bullet_augmentation
-from text_albumentations.tasks.continuation import continuation_augmentation
-from text_albumentations.tasks.qa_pairs import qa_pair_augmentation
-from text_albumentations.tasks.rephrase import rephrase_augmentation
-from text_albumentations.tasks.triplets import triplet_augmentation
+import text_albumentations as ta
 
 
 MODEL_NAME = "gpt-5.4-nano"
@@ -23,25 +15,13 @@ Guaranteed valid structure - No more parsing headaches or broken JSON
 Provider independence - Switch models without changing code
 """.strip()
 
-AUGMENTATIONS = [
-    ("bullets", bullet_augmentation),
-    ("qa_pairs", qa_pair_augmentation),
-    ("rephrase", rephrase_augmentation),
-    ("continuation", continuation_augmentation),
-    ("triplets", triplet_augmentation),
-]
+TASKS = ["bullets", "qa_pairs", "rephrase", "continuation", "triplets"]
 
 
 def main():
-    model = outlines.from_openai(openai.OpenAI(), MODEL_NAME)
-    runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
+    model = ta.OpenAIModel(MODEL_NAME, base_url="https://api.openai.com/v1")
 
-    all_rows = []
-    for name, augmentation in AUGMENTATIONS:
-        rows = run_augmentation(PASSAGE, augmentation, runtime)
-        all_rows.extend(rows)
-        print(f"augmentation={name} rows={len(rows)}")
-
+    all_rows = ta.augment(PASSAGE, tasks=TASKS, model=model)
     print(f"total_rows={len(all_rows)}")
 
     print()
@@ -50,6 +30,7 @@ def main():
         print(f"Input: \n{row.input}\n")
         print(f"Output: \n{row.output}\n")
         print("\n\n--------\n\n")
+
 
 if __name__ == "__main__":
     main()

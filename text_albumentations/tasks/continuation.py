@@ -67,6 +67,7 @@ class ContinuationAdapter(BaseAlpacaAdapter[str, ContinuationSlices]):
 class ContinuationAugmentation(BaseSingleChunkAugmentation[ContinuationSlices]):
     schema = ContinuationSlices
     system_prompt = "Generate continuation supervision slices from the provided passage."
+    selection_hint = "the passage is at least a few sentences long, so prefix/suffix slices are meaningful."
     adapters = (ContinuationAdapter(),)
 
     def generate_one(

@@ -64,6 +64,7 @@ class PythonListBulletAdapter(BaseAlpacaAdapter[str, BulletList]):
 class BulletAugmentation(BaseSingleChunkAugmentation[BulletList]):
     schema = BulletList
     system_prompt = SYSTEM_PROMPT
+    selection_hint = "the passage contains several distinct facts or points worth itemizing."
     response_formats = (
         AlpacaResponseFormat(
             name="markdown",

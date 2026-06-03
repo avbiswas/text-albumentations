@@ -1,9 +1,7 @@
 # Demonstrates chunking a long string, running an augmentation per chunk, and saving Alpaca rows to JSONL.
 
-import openai
-import outlines
-
-from text_albumentations import OutlinesModel, save_long_text_dataset
+import text_albumentations as ta
+from text_albumentations import save_long_text_dataset
 from text_albumentations.tasks.bullets import bullet_augmentation
 
 
@@ -21,13 +19,12 @@ Attention-based models can compare tokens directly across the sequence.
 
 
 def main():
-    model = outlines.from_openai(openai.OpenAI(), MODEL_NAME)
-    runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
+    model = ta.OpenAIModel(MODEL_NAME, base_url="https://api.openai.com/v1")
     rows = save_long_text_dataset(
         LONG_TEXT,
         OUTPUT_JSONL,
         bullet_augmentation,
-        runtime,
+        model,
         chunk_size_chars=300,
         overlap_chars=0,
     )

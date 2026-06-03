@@ -189,6 +189,7 @@ class JsonQaAdapter(BaseAlpacaAdapter[str, QAList]):
 class QaPairAugmentation(BaseSingleChunkAugmentation[QAList]):
     schema = QAList
     system_prompt = SYSTEM_PROMPT
+    selection_hint = "the passage contains factual content that supports specific, answerable questions."
     response_formats = (
         AlpacaResponseFormat(
             name="markdown",

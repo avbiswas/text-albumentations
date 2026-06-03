@@ -3,6 +3,17 @@ from text_albumentations.base import (
     BaseMultiChunkAugmentation,
     BaseSingleChunkAugmentation,
 )
+from text_albumentations.easy import (
+    augment,
+    list_tasks,
+    save,
+    task,
+)
+from text_albumentations.models import (
+    LocalHFModel,
+    LocalMLXModel,
+    OpenAIModel,
+)
 from text_albumentations.ingest import (
     agenerate_rows_from_long_text,
     asave_long_text_dataset,
@@ -56,9 +67,12 @@ __all__ = [
     "BaseMultiChunkAugmentation",
     "BaseResponseFormat",
     "BaseSingleChunkAugmentation",
+    "LocalHFModel",
+    "LocalMLXModel",
     "MetaAugmentation",
     "MetaSelection",
     "ModelRuntime",
+    "OpenAIModel",
     "OutlinesModel",
     "OutlinesModelRuntime",
     "ReasoningTrace",
@@ -69,6 +83,7 @@ __all__ = [
     "agenerate_rows_from_long_text",
     "apply_best_augmentations",
     "arun_batch_augmentation",
+    "augment",
     "arun_augmentation",
     "asave_long_text_dataset",
     "build_mlx_outlines_model",
@@ -77,8 +92,11 @@ __all__ = [
     "get_openai_async_semaphore",
     "generate_reasoning",
     "get_default_outlines_runtime",
+    "list_tasks",
     "run_batch_augmentation",
     "run_augmentation",
+    "save",
     "save_long_text_dataset",
     "save_dataset",
+    "task",
 ]

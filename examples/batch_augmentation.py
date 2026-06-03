@@ -1,9 +1,7 @@
 # Demonstrates batch decoding through the text_albumentations augmentation layer with one shared schema.
 
-import outlines
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-from text_albumentations import OutlinesModel, run_batch_augmentation
+import text_albumentations as ta
+from text_albumentations import run_batch_augmentation
 from text_albumentations.tasks.bullets import BulletAugmentation
 
 
@@ -18,23 +16,14 @@ PASSAGES = [
 
 def main():
     print("loading_transformers_model")
-    hf_model = AutoModelForCausalLM.from_pretrained(
-        MODEL_NAME,
-        torch_dtype="auto",
-        device_map="auto",
-    )
-    print("loading_tokenizer")
-    hf_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    print("building_outlines_model")
-    model = outlines.from_transformers(hf_model, hf_tokenizer)
-    runtime = OutlinesModel(model, max_tokens_parameter="max_new_tokens")
+    model = ta.LocalHFModel(MODEL_NAME)
     augmentation = BulletAugmentation(max_tokens=128, variations=0)
 
     print("running_batch_augmentation")
-    rows = run_batch_augmentation(PASSAGES, augmentation, runtime)
+    rows = run_batch_augmentation(PASSAGES, augmentation, model)
 
     print("mode=batch_augmentation")
-    print("runtime=outlines_transformers")
+    print("model=LocalHFModel")
     print(f"passages={len(PASSAGES)}")
     print(f"rows={len(rows)}")
 

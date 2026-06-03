@@ -1,10 +1,6 @@
-# Demonstrates sync OpenAI usage when the user creates the Outlines OpenAI model outside the library.
+# Demonstrates sync OpenAI usage through the OpenAIModel primitive.
 
-import openai
-import outlines
-
-from text_albumentations import OutlinesModel, run_augmentation
-from text_albumentations.tasks.bullets import bullet_augmentation
+import text_albumentations as ta
 
 
 MODEL_NAME = "gpt-5.4-nano"
@@ -12,14 +8,13 @@ PASSAGE = "The Transformer replaces recurrence with attention and improves paral
 
 
 def main():
-    client = openai.OpenAI()
-    model = outlines.from_openai(client, MODEL_NAME)
-    runtime = OutlinesModel(model, max_tokens_parameter="max_completion_tokens")
+    # api_key/base_url fall back to OPENAI_API_KEY / OPENAI_BASE_URL env vars
+    model = ta.OpenAIModel(MODEL_NAME, base_url="https://api.openai.com/v1")
 
-    print("client_type=OpenAI")
-    print("runtime_mode=sync")
+    print("model_type=OpenAIModel")
+    print("mode=sync")
 
-    rows = run_augmentation(PASSAGE, bullet_augmentation, runtime)
+    rows = ta.augment(PASSAGE, tasks=["bullets"], model=model)
 
     for row in rows:
         print(row.model_dump_json())

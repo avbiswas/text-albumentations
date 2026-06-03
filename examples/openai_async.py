@@ -1,14 +1,9 @@
-# Demonstrates async OpenAI usage with bounded concurrency when the user creates the Outlines OpenAI model outside the library.
+# Demonstrates async OpenAI usage with bounded concurrency through the OpenAIModel primitive.
 
 import asyncio
 
-import openai
-import outlines
-
-from text_albumentations import (
-    OutlinesModel,
-    arun_augmentation,
-)
+import text_albumentations as ta
+from text_albumentations import arun_augmentation
 from text_albumentations.tasks.bullets import bullet_augmentation
 
 
@@ -18,20 +13,18 @@ TOTAL_CONCURRENT_CALLS = 4
 
 
 async def main():
-    client = openai.AsyncOpenAI()
-    model = outlines.from_openai(client, MODEL_NAME)
-    runtime = OutlinesModel(
-        model,
+    model = ta.OpenAIModel(
+        MODEL_NAME,
+        base_url="https://api.openai.com/v1",
         async_mode=True,
         total_concurrent_calls=TOTAL_CONCURRENT_CALLS,
-        max_tokens_parameter="max_completion_tokens",
     )
 
-    print("client_type=AsyncOpenAI")
-    print("runtime_mode=async")
+    print("model_type=OpenAIModel")
+    print("mode=async")
     print(f"total_concurrent_calls={TOTAL_CONCURRENT_CALLS}")
 
-    rows = await arun_augmentation(PASSAGE, bullet_augmentation, runtime)
+    rows = await arun_augmentation(PASSAGE, bullet_augmentation, model)
 
     for row in rows:
         print(row.model_dump_json())

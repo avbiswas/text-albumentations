@@ -30,6 +30,7 @@ class RephraseAdapter(BaseAlpacaAdapter[str, Rewritten]):
 class RephraseAugmentation(BaseSingleChunkAugmentation[Rewritten]):
     schema = Rewritten
     system_prompt = SYSTEM_PROMPT
+    selection_hint = "the passage is prose that can be restated or elaborated without losing meaning."
     adapters = (RephraseAdapter(),)
     temperature = 0.5
 

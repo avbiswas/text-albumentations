@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, Field, create_model
 
 from text_albumentations.base import BaseSingleChunkAugmentation
 from text_albumentations.runner import arun_augmentation, run_augmentation
@@ -8,9 +10,17 @@ from text_albumentations.runtime import ModelRuntime
 from text_albumentations.utils import AlpacaDataset
 
 
+# (name, augmentation) — the selection hint comes from the augmentation's
+# `selection_hint` attribute. A third element overrides it.
+AugmentationEntry = (
+    tuple[str, BaseSingleChunkAugmentation]
+    | tuple[str, BaseSingleChunkAugmentation, str]
+)
+
+
 class AugmentationOption(BaseModel):
     name: str
-    description: str
+    selection_hint: str
 
 
 class MetaSelection(BaseModel):
@@ -32,10 +42,28 @@ class MetaSelection(BaseModel):
     )
 
 
-def _build_selection_prompt(options: list[AugmentationOption]) -> str:
-    aug_descriptions = "\n".join(
-        f"- {opt.name}: {opt.description}" for opt in options
+def _build_selection_schema(names: tuple[str, ...]) -> type[MetaSelection]:
+    if not names:
+        return MetaSelection
+    return create_model(
+        "ConfiguredMetaSelection",
+        __base__=MetaSelection,
+        selected=(
+            list[Literal[names]],  # type: ignore[valid-type]
+            Field(
+                ...,
+                description="Names of augmentations that would work well for this passage",
+            ),
+        ),
     )
+
+
+def _describe_option(option: AugmentationOption) -> str:
+    return f"- {option.name}: pick when {option.selection_hint}"
+
+
+def _build_selection_prompt(options: list[AugmentationOption]) -> str:
+    aug_descriptions = "\n".join(_describe_option(opt) for opt in options)
     return (
         "You are a data quality evaluator and augmentation selector.\n\n"
         "Step 1: Assess whether the passage is low quality. A passage is low quality if it is:\n"
@@ -60,19 +88,31 @@ class MetaAugmentation(BaseSingleChunkAugmentation[MetaSelection]):
 
     def __init__(
         self,
-        augmentations: list[tuple[str, BaseSingleChunkAugmentation, str]],
+        augmentations: list[AugmentationEntry],
         *,
         enable_quality_filter: bool = True,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self._aug_map: dict[str, BaseSingleChunkAugmentation] = {
-            name: aug for name, aug, _ in augmentations
-        }
-        self._aug_options = [
-            AugmentationOption(name=name, description=desc)
-            for name, _, desc in augmentations
-        ]
+        self._aug_map: dict[str, BaseSingleChunkAugmentation] = {}
+        self._aug_options: list[AugmentationOption] = []
+        for entry in augmentations:
+            name, aug = entry[0], entry[1]
+            hint = entry[2] if len(entry) > 2 else aug.selection_hint
+            if not hint:
+                raise ValueError(
+                    f"Augmentation '{name}' has no selection_hint. Set the "
+                    "selection_hint attribute on the augmentation (or pass it "
+                    "as a third tuple element) so the smart switch knows when "
+                    "to pick it."
+                )
+            self._aug_map[name] = aug
+            self._aug_options.append(
+                AugmentationOption(name=name, selection_hint=hint)
+            )
+        # Constrain `selected` to the actual augmentation names so the
+        # selector cannot hallucinate a task that does not exist.
+        self.schema = _build_selection_schema(tuple(self._aug_map))
         self.enable_quality_filter = enable_quality_filter
 
     def build_messages(
@@ -124,7 +164,7 @@ class MetaAugmentation(BaseSingleChunkAugmentation[MetaSelection]):
 
 def apply_best_augmentations(
     passage: str,
-    augmentations: list[tuple[str, BaseSingleChunkAugmentation, str]],
+    augmentations: list[AugmentationEntry],
     runtime: ModelRuntime,
     *,
     enable_quality_filter: bool = True,
@@ -143,7 +183,7 @@ def apply_best_augmentations(
 
 async def aapply_best_augmentations(
     passage: str,
-    augmentations: list[tuple[str, BaseSingleChunkAugmentation, str]],
+    augmentations: list[AugmentationEntry],
     runtime: ModelRuntime,
     *,
     enable_quality_filter: bool = True,

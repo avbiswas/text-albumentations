@@ -18,6 +18,11 @@ OutputT = TypeVar("OutputT", bound=BaseModel)
 class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
     schema: type[OutputT]
     system_prompt: str
+    # One-liner telling the smart switch *when* this augmentation fits a
+    # passage (e.g. "the passage states relationships between entities").
+    # Read only by the selector LLM in meta.py — never sent to the augmenter
+    # model. That is system_prompt's job.
+    selection_hint: str | None = None
     adapters: Sequence[BaseAlpacaAdapter[PassageT, OutputT]] = ()
     response_formats: Sequence[BaseResponseFormat[PassageT, OutputT]] = ()
     temperature: float = 0.2

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "text-albumentations"
-version = "0.5.0"
+version = "1.0.0"
 description = "Structured synthetic text data generation for SFT and distillation."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -17,6 +17,17 @@ dependencies = [
     "openai>=2.30.0",
     "outlines>=1.2.12",
     "pydantic>=2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: tests that need a live model server (deselect with '-m \"not integration\"')",
 ]
 
 [tool.setuptools.packages.find]
