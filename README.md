@@ -4,6 +4,8 @@
 
 PyPI: https://pypi.org/project/text-albumentations/
 
+![text-albumentations pipeline](assets/pipeline.svg)
+
 The goal is to help generate instruction-tuning and distillation datasets from existing text corpora by applying structured augmentations over passages.
 
 This is built for the practical case where good supervised fine-tuning often requires more examples than you already have, and where synthetic data generation is one of the fastest ways to create task-shaped training data from raw documents.

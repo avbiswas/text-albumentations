@@ -1,127 +1,168 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" style="background:#0d1117;font-family:system-ui,-apple-system,sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" style="background:#f8fafc;font-family:system-ui,-apple-system,sans-serif">
   <defs>
-    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#3b82f6"/>
-      <stop offset="100%" stop-color="#8b5cf6"/>
+    <linearGradient id="flowGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="40%" stop-color="#7c3aed"/>
+      <stop offset="70%" stop-color="#db2777"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
     </linearGradient>
-    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#8b5cf6"/>
-      <stop offset="100%" stop-color="#ec4899"/>
-    </linearGradient>
-    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
-      <stop offset="50%" stop-color="#8b5cf6" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.3"/>
-    </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#000" flood-opacity="0.4"/>
-    </filter>
+    <filter id="glow"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="softShadow"><feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#1e1b4b" flood-opacity="0.08"/></filter>
+    <filter id="cardShadow"><feDropShadow dx="0" dy="3" stdDeviation="8" flood-color="#4f46e5" flood-opacity="0.06"/></filter>
   </defs>
 
-  <!-- Title -->
-  <text x="600" y="52" text-anchor="middle" fill="#e6edf3" font-size="26" font-weight="700" letter-spacing="-0.5">text-albumentations</text>
-  <text x="600" y="78" text-anchor="middle" fill="#8b949e" font-size="14">One passage → Auto-picked augmentations → Reasoning traces → Dataset</text>
+  <!-- Background flow -->
+  <path d="M0 350 C200 300, 400 250, 600 200 C800 150, 1000 180, 1200 120" stroke="url(#flowGrad)" stroke-width="80" fill="none" opacity="0.03" filter="url(#glow)"/>
+  <path d="M0 420 C200 460, 400 420, 600 380 C800 340, 1000 400, 1200 360" stroke="url(#flowGrad)" stroke-width="100" fill="none" opacity="0.02" filter="url(#glow)"/>
 
-  <!-- ========== Step 1: Passage ========== -->
-  <rect x="30" y="120" width="220" height="100" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="140" y="152" text-anchor="middle" fill="#8b949e" font-size="11" letter-spacing="1">INPUT</text>
-  <text x="140" y="178" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Raw Passage</text>
-  <text x="140" y="200" text-anchor="middle" fill="#8b949e" font-size="11">string</text>
+  <!-- === TITLE === -->
+  <text x="600" y="50" text-anchor="middle" fill="#0f172a" font-size="32" font-weight="800" letter-spacing="-0.5">text-albumentations</text>
 
-  <!-- Arrow 1 -->
-  <line x1="250" y1="170" x2="310" y2="170" stroke="url(#g1)" stroke-width="2" marker-end="url(#arrow1)"/>
-  <defs><marker id="arrow1" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#3b82f6"/></marker></defs>
+  <!-- === PASSAGE (left) - document icons === -->
+  <g filter="url(#softShadow)">
+    <rect x="30" y="215" width="170" height="115" rx="24" fill="#fff" stroke="#e0e7ff" stroke-width="2"/>
+    <rect x="30" y="215" width="170" height="115" rx="24" fill="url(#flowGrad)" opacity="0.04"/>
+  </g>
+  <text x="115" y="248" text-anchor="middle" fill="#4f46e5" font-size="10" font-weight="700" letter-spacing="2">DOCUMENTS</text>
 
-  <!-- ========== Step 2: Quality Filter ========== -->
-  <rect x="315" y="108" width="240" height="124" rx="12" fill="#161b22" stroke="url(#g1)" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="435" y="140" text-anchor="middle" fill="#3b82f6" font-size="11" letter-spacing="1">STEP 1</text>
-  <text x="435" y="166" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Quality Filter</text>
-  <text x="435" y="188" text-anchor="middle" fill="#8b949e" font-size="11">LLM assesses passage quality</text>
-  <text x="435" y="208" text-anchor="middle" fill="#8b949e" font-size="11">Rejects: too short, nonsensical,</text>
-  <text x="435" y="224" text-anchor="middle" fill="#8b949e" font-size="11">boilerplate, metadata-only</text>
+  <!-- Document icons centered in the box -->
+  <!-- Row 1 -->
+  <g transform="translate(84, 258)">
+    <rect x="0" y="0" width="26" height="30" rx="3" fill="#eef2ff" stroke="#c7d2fe" stroke-width="1"/>
+    <line x1="5" y1="9" x2="21" y2="9" stroke="#818cf8" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="5" y1="15" x2="16" y2="15" stroke="#a5b4fc" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="5" y1="21" x2="13" y2="21" stroke="#a5b4fc" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(119, 258)">
+    <rect x="0" y="0" width="26" height="30" rx="3" fill="#faf5ff" stroke="#ddd6fe" stroke-width="1"/>
+    <line x1="5" y1="9" x2="21" y2="9" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="5" y1="15" x2="14" y2="15" stroke="#c4b5fd" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="5" y1="21" x2="18" y2="21" stroke="#c4b5fd" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+  <!-- Row 2 -->
+  <g transform="translate(84, 294)">
+    <rect x="0" y="0" width="26" height="30" rx="3" fill="#fdf2f8" stroke="#fbcfe8" stroke-width="1"/>
+    <line x1="5" y1="9" x2="18" y2="9" stroke="#f472b6" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="5" y1="15" x2="21" y2="15" stroke="#f9a8d4" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="5" y1="21" x2="11" y2="21" stroke="#f9a8d4" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(119, 294)">
+    <rect x="0" y="0" width="26" height="30" rx="3" fill="#fff7ed" stroke="#fed7aa" stroke-width="1"/>
+    <line x1="5" y1="9" x2="20" y2="9" stroke="#fb923c" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="5" y1="15" x2="15" y2="15" stroke="#fdba74" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="5" y1="21" x2="19" y2="21" stroke="#fdba74" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
 
-  <!-- Arrow 2 -->
-  <line x1="555" y1="170" x2="615" y2="170" stroke="url(#g2)" stroke-width="2" marker-end="url(#arrow2)"/>
-  <defs><marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#8b5cf6"/></marker></defs>
+  <!-- === QUALITY GATE === -->
+  <path d="M200 272 C250 272, 250 190, 300 170" stroke="#dc2626" stroke-width="1.5" fill="none" stroke-dasharray="5 4" opacity="0.5"/>
+  <rect x="260" y="140" width="140" height="34" rx="17" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+  <text x="330" y="161" text-anchor="middle" fill="#dc2626" font-size="10" font-weight="600">LOW QUALITY → REJECT</text>
 
-  <!-- ========== Step 3: Auto-Pick ========== -->
-  <rect x="620" y="108" width="240" height="124" rx="12" fill="#161b22" stroke="url(#g2)" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="740" y="140" text-anchor="middle" fill="#8b5cf6" font-size="11" letter-spacing="1">STEP 2</text>
-  <text x="740" y="166" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Auto-Pick</text>
-  <text x="740" y="188" text-anchor="middle" fill="#8b949e" font-size="11">LLM selects best augmentations</text>
-  <text x="740" y="208" text-anchor="middle" fill="#8b949e" font-size="11">from a provided list based on</text>
-  <text x="740" y="224" text-anchor="middle" fill="#8b949e" font-size="11">passage content &amp; structure</text>
+  <path d="M200 272 C280 272, 280 272, 320 272" stroke="#4f46e5" stroke-width="2.5" fill="none" marker-end="url(#arrowE)"/>
+  <defs><marker id="arrowE" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto"><circle cx="3" cy="3" r="3" fill="#4f46e5"/></marker></defs>
 
-  <!-- Arrow 3 -->
-  <line x1="860" y1="170" x2="920" y2="170" stroke="#ec4899" stroke-width="2" marker-end="url(#arrow3)"/>
-  <defs><marker id="arrow3" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#ec4899"/></marker></defs>
+  <!-- Quality gate pill -->
+  <rect x="305" y="249" width="100" height="46" rx="23" fill="#fff" stroke="#e0e7ff" stroke-width="1.5" filter="url(#cardShadow)"/>
+  <text x="355" y="269" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700">QUALITY</text>
+  <text x="355" y="283" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700">GATE ✓</text>
 
-  <!-- ========== Step 4: Augmentations Run ========== -->
-  <rect x="925" y="100" width="250" height="140" rx="12" fill="#161b22" stroke="url(#g3)" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="1050" y="132" text-anchor="middle" fill="#ec4899" font-size="11" letter-spacing="1">STEP 3</text>
-  <text x="1050" y="158" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Generate + Reason</text>
-  <text x="1050" y="182" text-anchor="middle" fill="#8b949e" font-size="11">Selected augmentations run</text>
-  <text x="1050" y="202" text-anchor="middle" fill="#8b949e" font-size="11">Structured output via Outlines</text>
-  <text x="1050" y="222" text-anchor="middle" fill="#8b949e" font-size="11">Reasoning traces per row</text>
-  <text x="1050" y="242" text-anchor="middle" fill="#8b949e" font-size="11">(chain-of-thought deduction)</text>
+  <!-- === SMART SWITCH === -->
+  <path d="M405 272 C460 272, 460 272, 500 272" stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#arrowP)"/>
+  <defs><marker id="arrowP" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto"><circle cx="3" cy="3" r="3" fill="#7c3aed"/></marker></defs>
 
-  <!-- ========== Bottom section: Augmentation options ========== -->
-  <text x="600" y="300" text-anchor="middle" fill="#8b949e" font-size="12" letter-spacing="1">AVAILABLE AUGMENTATIONS</text>
+  <g filter="url(#cardShadow)">
+    <rect x="485" y="244" width="100" height="56" rx="20" fill="#fff" stroke="#7c3aed" stroke-width="2"/>
+    <rect x="485" y="244" width="100" height="56" rx="20" fill="url(#flowGrad)" opacity="0.06"/>
+  </g>
+  <text x="535" y="270" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" letter-spacing="1.5">SMART</text>
+  <text x="535" y="286" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" letter-spacing="1.5">SWITCH</text>
 
-  <!-- Bullets -->
-  <rect x="50" y="320" width="200" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="150" y="348" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">● bullets</text>
-  <text x="150" y="370" text-anchor="middle" fill="#8b949e" font-size="11">Key point extraction</text>
+  <!-- === FAN OUT === -->
+  <path d="M585 272 C620 215, 630 140, 670 135" stroke="#818cf8" stroke-width="1.8" fill="none" opacity="0.5"/>
+  <path d="M585 272 C620 240, 640 185, 670 200" stroke="#a78bfa" stroke-width="1.8" fill="none" opacity="0.5"/>
+  <path d="M585 272 C620 260, 640 250, 670 265" stroke="#c084fc" stroke-width="1.8" fill="none" opacity="0.5"/>
+  <path d="M585 272 C620 285, 640 310, 670 330" stroke="#e879f9" stroke-width="1.8" fill="none" opacity="0.5"/>
+  <path d="M585 272 C620 315, 630 370, 670 395" stroke="#f472b6" stroke-width="1.8" fill="none" opacity="0.5"/>
+  <path d="M585 272 C620 340, 630 430, 670 460" stroke="#fb923c" stroke-width="1.8" fill="none" opacity="0.5"/>
+  <path d="M585 272 C620 365, 630 490, 670 525" stroke="#f59e0b" stroke-width="1.8" fill="none" opacity="0.5"/>
 
-  <!-- QA Pairs -->
-  <rect x="270" y="320" width="200" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="370" y="348" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">↔ qa_pairs</text>
-  <text x="370" y="370" text-anchor="middle" fill="#8b949e" font-size="11">Question-answer pairs</text>
+  <!-- Augmentation cards -->
+  <rect x="660" y="112" width="200" height="44" rx="14" fill="#fff" stroke="#818cf8" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <circle cx="680" cy="134" r="4" fill="#818cf8"/>
+  <text x="692" y="130" fill="#4f46e5" font-size="12" font-weight="600">● Bullets</text>
+  <text x="692" y="146" fill="#94a3b8" font-size="10">Key point extraction</text>
 
-  <!-- Rephrase -->
-  <rect x="490" y="320" width="200" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="590" y="348" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">↻ rephrase</text>
-  <text x="590" y="370" text-anchor="middle" fill="#8b949e" font-size="11">Rewrite &amp; elaboration</text>
+  <rect x="660" y="178" width="200" height="44" rx="14" fill="#fff" stroke="#a78bfa" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <circle cx="680" cy="200" r="4" fill="#a78bfa"/>
+  <text x="692" y="196" fill="#7c3aed" font-size="12" font-weight="600">↔ QA Pairs</text>
+  <text x="692" y="212" fill="#94a3b8" font-size="10">Question-answer pairs</text>
 
-  <!-- Triplets -->
-  <rect x="710" y="320" width="200" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="810" y="348" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">◈ triplets</text>
-  <text x="810" y="370" text-anchor="middle" fill="#8b949e" font-size="11">Knowledge graph triplets</text>
+  <rect x="660" y="244" width="200" height="44" rx="14" fill="#fff" stroke="#c084fc" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <circle cx="680" cy="266" r="4" fill="#c084fc"/>
+  <text x="692" y="262" fill="#9333ea" font-size="12" font-weight="600">↻ Rephrase</text>
+  <text x="692" y="278" fill="#94a3b8" font-size="10">Elaborated rewrite</text>
 
-  <!-- Continuation -->
-  <rect x="930" y="320" width="220" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="1040" y="348" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">→ continuation</text>
-  <text x="1040" y="370" text-anchor="middle" fill="#8b949e" font-size="11">Prefix/suffix/middle slices</text>
+  <rect x="660" y="310" width="200" height="44" rx="14" fill="#fff" stroke="#e879f9" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <circle cx="680" cy="332" r="4" fill="#e879f9"/>
+  <text x="692" y="328" fill="#c026d3" font-size="12" font-weight="600">◈ Triplets</text>
+  <text x="692" y="344" fill="#94a3b8" font-size="10">Knowledge graph</text>
 
-  <!-- ========== Bottom section: Output ========== -->
-  <rect x="50" y="420" width="1100" height="60" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="600" y="448" text-anchor="middle" fill="#8b949e" font-size="12" letter-spacing="1">OUTPUT: ALPACA-FORMAT DATASET</text>
-  <text x="600" y="470" text-anchor="middle" fill="#e6edf3" font-size="13" font-family="monospace">{ instruction, input, output, reasoning } · JSONL</text>
+  <rect x="660" y="376" width="200" height="44" rx="14" fill="#fff" stroke="#f472b6" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <circle cx="680" cy="398" r="4" fill="#f472b6"/>
+  <text x="692" y="394" fill="#db2777" font-size="12" font-weight="600">→ Continuation</text>
+  <text x="692" y="410" fill="#94a3b8" font-size="10">Prefix / suffix slices</text>
 
-  <!-- Bottom row: Runtimes -->
-  <text x="600" y="520" text-anchor="middle" fill="#8b949e" font-size="11" letter-spacing="1">RUNTIMES</text>
-  <rect x="80" y="536" width="150" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="155" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">OpenAI (sync/async)</text>
+  <rect x="660" y="442" width="200" height="44" rx="14" fill="#fff" stroke="#fb923c" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <circle cx="680" cy="464" r="4" fill="#fb923c"/>
+  <text x="692" y="460" fill="#ea580c" font-size="12" font-weight="600">⇔ Comparison</text>
+  <text x="692" y="476" fill="#94a3b8" font-size="10">Two-passage diff</text>
 
-  <rect x="250" y="536" width="170" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="335" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">Local server (OpenAI API)</text>
+  <rect x="660" y="508" width="200" height="44" rx="14" fill="#fff" stroke="#f59e0b" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <circle cx="680" cy="530" r="4" fill="#f59e0b"/>
+  <text x="692" y="526" fill="#d97706" font-size="12" font-weight="600">⌕ Retrieval</text>
+  <text x="692" y="542" fill="#94a3b8" font-size="10">Passage retrieval</text>
 
-  <rect x="440" y="536" width="130" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="505" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">MLX (Apple Silicon)</text>
+  <!-- === REASONING tag === -->
+  <path d="M585 272 C620 390, 630 560, 670 590" stroke="#10b981" stroke-width="1.8" fill="none" opacity="0.5"/>
+  <rect x="660" y="574" width="200" height="36" rx="12" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1" filter="url(#cardShadow)"/>
+  <text x="760" y="597" text-anchor="middle" fill="#059669" font-size="11" font-weight="600">💭 Reasoning traces</text>
 
-  <rect x="590" y="536" width="150" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="665" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">Transformers (HF)</text>
+  <!-- === CONVERGE to output === -->
+  <path d="M860 134 C900 134, 910 190, 940 300" stroke="#818cf8" stroke-width="1" fill="none" opacity="0.3"/>
+  <path d="M860 200 C900 200, 910 240, 940 300" stroke="#a78bfa" stroke-width="1" fill="none" opacity="0.3"/>
+  <path d="M860 266 C900 266, 910 280, 940 300" stroke="#c084fc" stroke-width="1" fill="none" opacity="0.3"/>
+  <path d="M860 332 C900 332, 910 330, 940 300" stroke="#e879f9" stroke-width="1" fill="none" opacity="0.3"/>
+  <path d="M860 398 C900 398, 910 360, 940 300" stroke="#f472b6" stroke-width="1" fill="none" opacity="0.3"/>
+  <path d="M860 464 C900 464, 910 410, 940 300" stroke="#fb923c" stroke-width="1" fill="none" opacity="0.3"/>
+  <path d="M860 530 C900 530, 910 460, 940 300" stroke="#f59e0b" stroke-width="1" fill="none" opacity="0.3"/>
 
-  <rect x="760" y="536" width="170" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="845" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">Outlines (constrained)</text>
+  <!-- === OUTPUT === -->
+  <g filter="url(#cardShadow)">
+    <rect x="925" y="220" width="250" height="180" rx="22" fill="#fff" stroke="url(#flowGrad)" stroke-width="2"/>
+    <rect x="925" y="220" width="250" height="180" rx="22" fill="url(#flowGrad)" opacity="0.04"/>
+  </g>
+  <text x="1050" y="250" text-anchor="middle" fill="#475569" font-size="11" font-weight="700" letter-spacing="1.5">TRAINING ROWS</text>
 
-  <rect x="950" y="536" width="200" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="1050" y="557" text-anchor="middle" fill="#e6edf3" font-size="11">Extensible (ModelRuntime ABC)</text>
+  <!-- Fields vertical (left-aligned) -->
+  <rect x="945" y="266" width="84" height="24" rx="7" fill="#eef2ff"/>
+  <text x="953" y="282" fill="#4f46e5" font-size="10" font-weight="600" font-family="monospace">instruction</text>
 
-  <!-- Footer -->
-  <text x="600" y="610" text-anchor="middle" fill="#30363d" font-size="10">text-albumentations · pypi.org/project/text-albumentations</text>
+  <rect x="945" y="296" width="48" height="24" rx="7" fill="#faf5ff"/>
+  <text x="953" y="312" fill="#7c3aed" font-size="10" font-weight="600" font-family="monospace">input</text>
+
+  <rect x="945" y="326" width="54" height="24" rx="7" fill="#fdf2f8"/>
+  <text x="953" y="342" fill="#db2777" font-size="10" font-weight="600" font-family="monospace">output</text>
+
+  <rect x="945" y="356" width="72" height="24" rx="7" fill="#ecfdf5"/>
+  <text x="953" y="372" fill="#059669" font-size="10" font-weight="600" font-family="monospace">reasoning</text>
+
+  <!-- Database icon (right of fields) -->
+  <g transform="translate(1070, 282)">
+    <path d="M0 8 v66 a35 11 0 0 0 70 0 v-66" fill="#eef2ff" stroke="#818cf8" stroke-width="2"/>
+    <ellipse cx="35" cy="8" rx="35" ry="11" fill="#e0e7ff" stroke="#818cf8" stroke-width="2"/>
+    <path d="M0 30 a35 11 0 0 0 70 0" fill="none" stroke="#a5b4fc" stroke-width="2"/>
+    <path d="M0 52 a35 11 0 0 0 70 0" fill="none" stroke="#a5b4fc" stroke-width="2"/>
+  </g>
+
+
 </svg>
