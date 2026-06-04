@@ -28,6 +28,11 @@ from text_albumentations.meta import (
     aapply_best_augmentations,
     apply_best_augmentations,
 )
+from text_albumentations.quality import (
+    QualityAssessment,
+    aquality_filter,
+    quality_filter,
+)
 from text_albumentations.reasoning import (
     ReasoningTrace,
     add_reasoning_to_dataset,
@@ -75,9 +80,11 @@ __all__ = [
     "OpenAIModel",
     "OutlinesModel",
     "OutlinesModelRuntime",
+    "QualityAssessment",
     "ReasoningTrace",
     "aadd_reasoning_to_dataset",
     "aapply_best_augmentations",
+    "aquality_filter",
     "add_reasoning_to_dataset",
     "agenerate_reasoning",
     "agenerate_rows_from_long_text",
@@ -93,6 +100,7 @@ __all__ = [
     "generate_reasoning",
     "get_default_outlines_runtime",
     "list_tasks",
+    "quality_filter",
     "run_batch_augmentation",
     "run_augmentation",
     "save",

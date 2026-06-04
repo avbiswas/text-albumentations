@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import TypeVar
@@ -8,6 +9,7 @@ from typing import TypeVar
 import outlines
 from outlines.inputs import Chat
 from pydantic import BaseModel
+from pydantic_core import ValidationError
 
 OutputT = TypeVar("OutputT", bound=BaseModel)
 
@@ -118,11 +120,13 @@ class OutlinesModel(ModelRuntime):
         async_mode: bool = False,
         total_concurrent_calls: int = DEFAULT_OPENAI_CONCURRENCY,
         max_tokens_parameter: str = "max_tokens",
+        generation_kwargs: dict[str, object] | None = None,
     ) -> None:
         self.model = model
         self.async_mode = async_mode
         self.total_concurrent_calls = total_concurrent_calls
         self.max_tokens_parameter = max_tokens_parameter
+        self.generation_kwargs = generation_kwargs or {}
 
     def generate_structured(
         self,
@@ -138,11 +142,11 @@ class OutlinesModel(ModelRuntime):
                 "Use 'await runtime.agenerate_structured(...)' instead."
             )
 
-        output = self.model(Chat(messages), output_type, **self._build_generation_kwargs(
+        output = self.model(Chat(self._prepare_messages(messages, output_type)), output_type, **self._build_generation_kwargs(
             temperature=temperature,
             max_tokens=max_tokens,
         ))
-        return output_type.model_validate_json(output)
+        return validate_json_output(output, output_type)
 
     def generate_variation(
         self,
@@ -165,14 +169,17 @@ class OutlinesModel(ModelRuntime):
             else output
         )
         new_output = self.model(
-            Chat(build_variation_messages(serialized_output, context)),
+            Chat(self._prepare_messages(
+                build_variation_messages(serialized_output, context),
+                output_type,
+            )),
             output_type,
             **self._build_generation_kwargs(
                 temperature=temperature,
                 max_tokens=max_tokens,
             ),
         )
-        return output_type.model_validate_json(new_output)
+        return validate_json_output(new_output, output_type)
 
     async def agenerate_structured(
         self,
@@ -188,14 +195,14 @@ class OutlinesModel(ModelRuntime):
         semaphore = get_openai_async_semaphore(self.total_concurrent_calls)
         async with semaphore:
             output = await self.model(
-                Chat(messages),
+                Chat(self._prepare_messages(messages, output_type)),
                 output_type,
                 **self._build_generation_kwargs(
                     temperature=temperature,
                     max_tokens=max_tokens,
                 ),
             )
-        return output_type.model_validate_json(output)
+        return validate_json_output(output, output_type)
 
     async def agenerate_variation(
         self,
@@ -217,14 +224,17 @@ class OutlinesModel(ModelRuntime):
         semaphore = get_openai_async_semaphore(self.total_concurrent_calls)
         async with semaphore:
             response = await self.model(
-                Chat(build_variation_messages(serialized_output, context)),
+                Chat(self._prepare_messages(
+                    build_variation_messages(serialized_output, context),
+                    output_type,
+                )),
                 output_type,
                 **self._build_generation_kwargs(
                     temperature=temperature,
                     max_tokens=max_tokens,
                 ),
             )
-        return output_type.model_validate_json(response)
+        return validate_json_output(response, output_type)
 
     def generate_structured_batch(
         self,
@@ -241,14 +251,17 @@ class OutlinesModel(ModelRuntime):
             )
 
         outputs = self.model.batch(
-            [Chat(messages) for messages in messages_batch],
+            [
+                Chat(self._prepare_messages(messages, output_type))
+                for messages in messages_batch
+            ],
             output_type=output_type,
             **self._build_generation_kwargs(
                 temperature=temperature,
                 max_tokens=max_tokens,
             ),
         )
-        return [output_type.model_validate_json(output) for output in outputs]
+        return [validate_json_output(output, output_type) for output in outputs]
 
     async def agenerate_structured_batch(
         self,
@@ -269,14 +282,17 @@ class OutlinesModel(ModelRuntime):
         semaphore = get_openai_async_semaphore(self.total_concurrent_calls)
         async with semaphore:
             outputs = await self.model.batch(
-                [Chat(messages) for messages in messages_batch],
+                [
+                    Chat(self._prepare_messages(messages, output_type))
+                    for messages in messages_batch
+                ],
                 output_type=output_type,
                 **self._build_generation_kwargs(
                     temperature=temperature,
                     max_tokens=max_tokens,
                 ),
             )
-        return [output_type.model_validate_json(output) for output in outputs]
+        return [validate_json_output(output, output_type) for output in outputs]
 
     def _build_generation_kwargs(
         self,
@@ -288,10 +304,39 @@ class OutlinesModel(ModelRuntime):
             "temperature": temperature,
             self.max_tokens_parameter: max_tokens,
         }
+        kwargs.update(self.generation_kwargs)
         if self.max_tokens_parameter == "max_tokens":
             kwargs["sampler"] = self._build_sampler(temperature)
             kwargs.pop("temperature")
         return kwargs
+
+    def _prepare_messages(
+        self,
+        messages: list[dict[str, str]],
+        output_type: type[OutputT],
+    ) -> list[dict[str, str]]:
+        schema = json.dumps(output_type.model_json_schema(), ensure_ascii=False)
+        schema_instruction = (
+            "The desired schema you must answer in is the following JSON Schema. "
+            "Return only JSON that conforms to it. Do not include markdown, "
+            f"prose, or extra keys.\nJSON Schema:\n{schema}"
+        )
+        prepared = [dict(message) for message in messages]
+        system_indexes = [
+            index
+            for index, message in enumerate(prepared)
+            if message.get("role") == "system"
+        ]
+        if not system_indexes:
+            prepared.insert(0, {"role": "system", "content": schema_instruction})
+            return prepared
+
+        system_index = system_indexes[-1]
+        prepared[system_index]["content"] = (
+            f"{prepared[system_index].get('content', '').rstrip()}\n\n"
+            f"{schema_instruction}"
+        )
+        return prepared
 
     def _build_sampler(self, temperature: float):
         import mlx_lm
@@ -300,6 +345,46 @@ class OutlinesModel(ModelRuntime):
 
 
 OutlinesModelRuntime = OutlinesModel
+
+
+def validate_json_output(output: str, output_type: type[OutputT]) -> OutputT:
+    try:
+        return output_type.model_validate_json(output)
+    except ValidationError:
+        if not isinstance(output, str):
+            raise
+        return output_type.model_validate_json(extract_json_object(output))
+
+
+def extract_json_object(text: str) -> str:
+    start = text.find("{")
+    if start == -1:
+        return text
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+
+    return text
 
 
 def get_openai_async_semaphore(

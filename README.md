@@ -195,6 +195,16 @@ model = ta.OpenAIModel("gpt-5-mini",
 
 All three arguments fall back to environment variables (`TEXT_ALBUMENTATIONS_MODEL`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`), so a configured shell can just call `ta.OpenAIModel()` — or skip the model entirely and call `ta.augment(text)`.
 
+`OpenAIModel` chooses a structured-output mode automatically from the model name (`response_format="auto"`). OpenAI/GPT and Gemini models default to strict JSON Schema mode. DeepSeek, Claude, Minimax, GLM, and unknown model families default to JSON-object mode. For every runtime backend, the Pydantic schema is also appended to the system prompt and validated locally after generation.
+
+Override when needed:
+
+```python
+model = ta.OpenAIModel(..., response_format="auto")          # default
+model = ta.OpenAIModel(..., response_format="json_schema")
+model = ta.OpenAIModel(..., response_format="json_object")
+```
+
 **In-process local models:**
 ```python
 model = ta.LocalMLXModel("mlx-community/Qwen3.5-4B-OptiQ-4bit")   # Apple Silicon
@@ -339,6 +349,29 @@ Each row gets a `reasoning` field with a Chain-of-Thought trace. Available funct
 | `generate_reasoning(passage, row, model)` | Add reasoning to a single row |
 | `add_reasoning_to_dataset(passage, dataset, model)` | Add reasoning to all rows |
 | `agenerate_reasoning(...)` / `aadd_reasoning_to_dataset(...)` | Async variants |
+
+### Quality Filter (Standalone)
+
+Use `ta.quality_filter(...)` to judge one datapoint against your own quality criteria. The datapoint can be a string or JSON-like Python value, and the result is a typed `QualityAssessment` with `is_quality` and `reason` fields:
+
+```python
+assessment = ta.quality_filter(
+    {
+        "instruction": "Answer the question.",
+        "input": "What does the Transformer replace?",
+        "output": "It replaces recurrence with attention.",
+    },
+    prompt="A quality datapoint is correct, grounded in the input, and self-contained.",
+    model=model,
+)
+
+if assessment.is_quality:
+    print("keep")
+else:
+    print(assessment.reason)
+```
+
+Async pipelines can use `await ta.aquality_filter(...)`.
 
 ### Batch Augmentation Over Multiple Passages
 

@@ -19,3 +19,6 @@ env/
 .idea/
 .vscode/
 *egg-info*
+
+filtered_datasets
+logs/
