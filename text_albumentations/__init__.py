@@ -22,6 +22,7 @@ from text_albumentations.models import (
     LocalHFModel,
     LocalMLXModel,
     OpenAIModel,
+    VertexAIModel,
 )
 from text_albumentations.ingest import (
     agenerate_rows_from_long_text,
@@ -92,6 +93,7 @@ __all__ = [
     "PostfilterAssessment",
     "ReasoningTrace",
     "TaskSelection",
+    "VertexAIModel",
     "aaugment",
     "aadd_reasoning_to_dataset",
     "aapply_best_augmentations",

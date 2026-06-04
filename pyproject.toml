@@ -19,6 +19,9 @@ dependencies = [
     "pydantic>=2",
 ]
 
+[project.optional-dependencies]
+vertex = ["google-genai>=1.0"]
+
 [dependency-groups]
 dev = [
     "datasets>=4.8.5",

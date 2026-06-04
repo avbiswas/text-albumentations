@@ -15,6 +15,7 @@ from text_albumentations.runtime import (
     OutlinesModel,
     build_mlx_outlines_model,
 )
+from text_albumentations.vertex import VertexAIModel
 
 
 class _JsonModeOpenAITypeAdapter:
