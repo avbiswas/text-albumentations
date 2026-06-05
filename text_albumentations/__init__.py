@@ -4,10 +4,19 @@ from text_albumentations.base import (
     BaseSingleChunkAugmentation,
 )
 from text_albumentations.easy import (
+    aaugment,
     augment,
+    aselect_tasks,
+    get_multi_task,
+    get_task,
     list_tasks,
+    list_multi_tasks,
+    resolve_multi_tasks,
+    resolve_tasks,
     save,
+    select_tasks,
     task,
+    TaskSelection,
 )
 from text_albumentations.models import (
     LocalHFModel,
@@ -28,10 +37,10 @@ from text_albumentations.meta import (
     aapply_best_augmentations,
     apply_best_augmentations,
 )
-from text_albumentations.quality import (
-    QualityAssessment,
-    aquality_filter,
-    quality_filter,
+from text_albumentations.postfilter import (
+    PostfilterAssessment,
+    apostfilter,
+    postfilter,
 )
 from text_albumentations.reasoning import (
     ReasoningTrace,
@@ -80,11 +89,14 @@ __all__ = [
     "OpenAIModel",
     "OutlinesModel",
     "OutlinesModelRuntime",
-    "QualityAssessment",
+    "PostfilterAssessment",
     "ReasoningTrace",
+    "TaskSelection",
+    "aaugment",
     "aadd_reasoning_to_dataset",
     "aapply_best_augmentations",
-    "aquality_filter",
+    "apostfilter",
+    "aselect_tasks",
     "add_reasoning_to_dataset",
     "agenerate_reasoning",
     "agenerate_rows_from_long_text",
@@ -98,13 +110,19 @@ __all__ = [
     "generate_rows_from_long_text",
     "get_openai_async_semaphore",
     "generate_reasoning",
+    "get_multi_task",
     "get_default_outlines_runtime",
+    "get_task",
     "list_tasks",
-    "quality_filter",
+    "list_multi_tasks",
+    "postfilter",
+    "resolve_multi_tasks",
+    "resolve_tasks",
     "run_batch_augmentation",
     "run_augmentation",
     "save",
     "save_long_text_dataset",
     "save_dataset",
+    "select_tasks",
     "task",
 ]

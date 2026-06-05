@@ -7,18 +7,55 @@ power users via the existing lower-level APIs.
 
 from __future__ import annotations
 
-from typing import Callable
+import asyncio
+import random
+from dataclasses import dataclass
+from typing import Callable, Literal
 
 from pydantic import BaseModel
 
-from text_albumentations.base import BaseSingleChunkAugmentation
+from text_albumentations.base import (
+    BaseMultiChunkAugmentation,
+    BaseSingleChunkAugmentation,
+)
 from text_albumentations.output_format_adapters import BaseAlpacaAdapter
-from text_albumentations.meta import apply_best_augmentations
+from text_albumentations.meta import MetaAugmentation
 from text_albumentations.models import OpenAIModel
-from text_albumentations.reasoning import add_reasoning_to_dataset
-from text_albumentations.runner import run_augmentation
+from text_albumentations.postfilter import apostfilter, postfilter
+from text_albumentations.reasoning import (
+    aadd_reasoning_to_dataset,
+    add_reasoning_to_dataset,
+)
+from text_albumentations.runner import arun_augmentation, run_augmentation
 from text_albumentations.runtime import ModelRuntime
 from text_albumentations.utils import AlpacaDataset, save_dataset
+
+SelectionMode = Literal["auto", "explicit", "sample"]
+TaskSpec = (
+    list[str | BaseSingleChunkAugmentation]
+    | tuple[str | BaseSingleChunkAugmentation, ...]
+    | dict[str, float]
+    | None
+)
+
+DEFAULT_POSTFILTER_PROMPT = """\
+A quality generated training datapoint should be useful for supervised fine-tuning.
+Keep the row only if the instruction is clear, the input contains enough context,
+and the output directly satisfies the instruction without contradiction,
+unsupported claims, truncation, or malformed boilerplate.
+"""
+
+
+@dataclass(frozen=True)
+class TaskSelection:
+    is_low_quality: bool
+    low_quality_reason: str
+    selected_tasks: list[str]
+    reasoning: str
+
+    @property
+    def is_quality(self) -> bool:
+        return not self.is_low_quality
 
 
 def _build_task_registry() -> dict[str, BaseSingleChunkAugmentation]:
@@ -41,12 +78,45 @@ def _build_task_registry() -> dict[str, BaseSingleChunkAugmentation]:
     }
 
 
+def _build_multi_task_registry() -> dict[str, BaseMultiChunkAugmentation]:
+    from text_albumentations import tasks
+
+    return {
+        "retrieval": tasks.retrieval_augmentation,
+        "comparison": tasks.comparison_augmentation,
+    }
+
+
 def list_tasks() -> dict[str, str]:
     """Names and selection hints of all built-in single-passage tasks."""
     return {
         name: aug.selection_hint or ""
         for name, aug in _build_task_registry().items()
     }
+
+
+def list_multi_tasks() -> dict[str, str]:
+    """Names and hints of all built-in multi-passage tasks."""
+    return {
+        name: aug.selection_hint or ""
+        for name, aug in _build_multi_task_registry().items()
+    }
+
+
+def get_task(name: str) -> BaseSingleChunkAugmentation:
+    registry = _build_task_registry()
+    if name not in registry:
+        raise ValueError(f"Unknown task '{name}'. Available tasks: {sorted(registry)}")
+    return registry[name]
+
+
+def get_multi_task(name: str) -> BaseMultiChunkAugmentation:
+    registry = _build_multi_task_registry()
+    if name not in registry:
+        raise ValueError(
+            f"Unknown multi-task '{name}'. Available multi-tasks: {sorted(registry)}"
+        )
+    return registry[name]
 
 
 def _build_output_renderer(
@@ -129,30 +199,157 @@ def task(
     return _FunctionTask(**augmentation_kwargs)
 
 
-def _resolve_tasks(
+def resolve_tasks(
     tasks: list[str | BaseSingleChunkAugmentation],
-    registry: dict[str, BaseSingleChunkAugmentation],
 ) -> list[BaseSingleChunkAugmentation]:
+    registry = _build_task_registry()
     resolved = []
     for task in tasks:
         if isinstance(task, str):
-            if task not in registry:
-                raise ValueError(
-                    f"Unknown task '{task}'. Available tasks: {sorted(registry)}"
-                )
-            resolved.append(registry[task])
+            resolved.append(get_task(task))
         else:
             resolved.append(task)
     return resolved
 
 
-def augment(
+def resolve_multi_tasks(
+    tasks: list[str | BaseMultiChunkAugmentation],
+) -> list[BaseMultiChunkAugmentation]:
+    resolved = []
+    for task in tasks:
+        if isinstance(task, str):
+            resolved.append(get_multi_task(task))
+        else:
+            resolved.append(task)
+    return resolved
+
+
+def _infer_selection_mode(tasks: TaskSpec, selection_mode: SelectionMode | None) -> SelectionMode:
+    if selection_mode is not None:
+        return selection_mode
+    if tasks is None:
+        return "auto"
+    if isinstance(tasks, dict):
+        return "sample"
+    return "explicit"
+
+
+def _task_entries(
+    tasks: list[str] | tuple[str, ...] | None,
+) -> list[tuple[str, BaseSingleChunkAugmentation]]:
+    registry = _build_task_registry()
+    if tasks is None:
+        return list(registry.items())
+    entries = []
+    for name in tasks:
+        if not isinstance(name, str):
+            raise TypeError("selection_mode='auto' requires named built-in tasks.")
+        entries.append((name, get_task(name)))
+    return entries
+
+
+def _sample_task_names(tasks: dict[str, float]) -> list[str]:
+    selected = []
+    for name, probability in tasks.items():
+        if probability < 0 or probability > 1:
+            raise ValueError("Task probabilities must be between 0 and 1.")
+        get_task(name)
+        if random.random() < probability:
+            selected.append(name)
+    return selected
+
+
+def _normalize_postfilter_prompt(postfilter_setting: bool | str) -> str | None:
+    if postfilter_setting is False:
+        return None
+    if postfilter_setting is True:
+        return DEFAULT_POSTFILTER_PROMPT
+    if not postfilter_setting.strip():
+        raise ValueError("postfilter criteria must be non-empty.")
+    return postfilter_setting
+
+
+def _filter_rows(
+    rows: list[AlpacaDataset],
+    prompt: str | None,
+    model: ModelRuntime,
+) -> list[AlpacaDataset]:
+    if prompt is None:
+        return rows
+    kept = []
+    for row in rows:
+        assessment = postfilter(row.model_dump(), prompt, model=model)
+        if assessment.is_quality:
+            kept.append(row)
+    return kept
+
+
+async def _afilter_rows(
+    rows: list[AlpacaDataset],
+    prompt: str | None,
+    model: ModelRuntime,
+) -> list[AlpacaDataset]:
+    if prompt is None:
+        return rows
+    assessments = await asyncio.gather(
+        *[apostfilter(row.model_dump(), prompt, model=model) for row in rows]
+    )
+    return [
+        row
+        for row, assessment in zip(rows, assessments, strict=True)
+        if assessment.is_quality
+    ]
+
+
+def select_tasks(
     text: str,
-    tasks: list[str | BaseSingleChunkAugmentation] | None = None,
+    tasks: list[str] | tuple[str, ...] | None = None,
     *,
     model: ModelRuntime | None = None,
+    prefilter: bool = True,
+) -> TaskSelection:
+    if model is None:
+        model = OpenAIModel()
+    meta = MetaAugmentation(_task_entries(tasks), prefilter=prefilter)
+    selection = meta.generate_one(text, model)
+    selected = [] if prefilter and selection.is_low_quality else selection.selected
+    return TaskSelection(
+        is_low_quality=selection.is_low_quality,
+        low_quality_reason=selection.low_quality_reason,
+        selected_tasks=list(selected),
+        reasoning=selection.reasoning,
+    )
+
+
+async def aselect_tasks(
+    text: str,
+    tasks: list[str] | tuple[str, ...] | None = None,
+    *,
+    model: ModelRuntime | None = None,
+    prefilter: bool = True,
+) -> TaskSelection:
+    if model is None:
+        model = OpenAIModel(async_mode=True)
+    meta = MetaAugmentation(_task_entries(tasks), prefilter=prefilter)
+    selection = await meta.agenerate_one(text, model)
+    selected = [] if prefilter and selection.is_low_quality else selection.selected
+    return TaskSelection(
+        is_low_quality=selection.is_low_quality,
+        low_quality_reason=selection.low_quality_reason,
+        selected_tasks=list(selected),
+        reasoning=selection.reasoning,
+    )
+
+
+def augment(
+    text: str,
+    tasks: TaskSpec = None,
+    *,
+    selection_mode: SelectionMode | None = None,
+    model: ModelRuntime | None = None,
     add_reasoning: bool = False,
-    quality_filter: bool = True,
+    prefilter: bool = True,
+    postfilter: bool | str = False,
     save_to: str | None = None,
 ) -> list[AlpacaDataset]:
     """Generate training rows from a passage with one call.
@@ -169,23 +366,90 @@ def augment(
     if model is None:
         model = OpenAIModel()
 
-    registry = _build_task_registry()
+    mode = _infer_selection_mode(tasks, selection_mode)
+    postfilter_prompt = _normalize_postfilter_prompt(postfilter)
 
-    if tasks is None:
-        dataset = apply_best_augmentations(
+    if mode == "auto":
+        if isinstance(tasks, dict):
+            raise TypeError("selection_mode='auto' does not accept probability maps.")
+        selection = select_tasks(
             text,
-            list(registry.items()),
-            model,
-            enable_quality_filter=quality_filter,
-            add_reasoning=add_reasoning,
+            tasks,
+            model=model,
+            prefilter=prefilter,
         )
-    else:
         dataset = []
-        for augmentation in _resolve_tasks(tasks, registry):
+        for augmentation in resolve_tasks(selection.selected_tasks):
             dataset.extend(run_augmentation(text, augmentation, model))
-        if add_reasoning:
-            dataset = add_reasoning_to_dataset(text, dataset, model)
+    elif mode == "explicit":
+        if tasks is None or isinstance(tasks, dict):
+            raise TypeError("selection_mode='explicit' requires a task list.")
+        dataset = []
+        for augmentation in resolve_tasks(list(tasks)):
+            dataset.extend(run_augmentation(text, augmentation, model))
+    elif mode == "sample":
+        if not isinstance(tasks, dict):
+            raise TypeError("selection_mode='sample' requires a probability map.")
+        dataset = []
+        for augmentation in resolve_tasks(_sample_task_names(tasks)):
+            dataset.extend(run_augmentation(text, augmentation, model))
+    else:
+        raise ValueError("selection_mode must be one of: auto, explicit, sample.")
 
+    dataset = _filter_rows(dataset, postfilter_prompt, model)
+    if add_reasoning:
+        dataset = add_reasoning_to_dataset(text, dataset, model)
+
+    if save_to is not None:
+        save_dataset(dataset, save_to)
+    return dataset
+
+
+async def aaugment(
+    text: str,
+    tasks: TaskSpec = None,
+    *,
+    selection_mode: SelectionMode | None = None,
+    model: ModelRuntime | None = None,
+    add_reasoning: bool = False,
+    prefilter: bool = True,
+    postfilter: bool | str = False,
+    save_to: str | None = None,
+) -> list[AlpacaDataset]:
+    if model is None:
+        model = OpenAIModel(async_mode=True)
+
+    mode = _infer_selection_mode(tasks, selection_mode)
+    postfilter_prompt = _normalize_postfilter_prompt(postfilter)
+
+    if mode == "auto":
+        if isinstance(tasks, dict):
+            raise TypeError("selection_mode='auto' does not accept probability maps.")
+        selection = await aselect_tasks(
+            text,
+            tasks,
+            model=model,
+            prefilter=prefilter,
+        )
+        augmentations = resolve_tasks(selection.selected_tasks)
+    elif mode == "explicit":
+        if tasks is None or isinstance(tasks, dict):
+            raise TypeError("selection_mode='explicit' requires a task list.")
+        augmentations = resolve_tasks(list(tasks))
+    elif mode == "sample":
+        if not isinstance(tasks, dict):
+            raise TypeError("selection_mode='sample' requires a probability map.")
+        augmentations = resolve_tasks(_sample_task_names(tasks))
+    else:
+        raise ValueError("selection_mode must be one of: auto, explicit, sample.")
+
+    datasets = await asyncio.gather(
+        *[arun_augmentation(text, augmentation, model) for augmentation in augmentations]
+    )
+    dataset = [row for rows in datasets for row in rows]
+    dataset = await _afilter_rows(dataset, postfilter_prompt, model)
+    if add_reasoning:
+        dataset = await aadd_reasoning_to_dataset(text, dataset, model)
     if save_to is not None:
         save_dataset(dataset, save_to)
     return dataset

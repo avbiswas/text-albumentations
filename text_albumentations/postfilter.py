@@ -8,8 +8,16 @@ from pydantic import BaseModel, Field
 from text_albumentations.models import OpenAIModel
 from text_albumentations.runtime import ModelRuntime
 
+DEFAULT_POSTFILTER_PROMPT = """\
+A quality training datapoint should be useful for supervised fine-tuning.
+Keep the datapoint only if the instruction is clear, the input contains enough
+context to support the output, and the output directly satisfies the instruction.
+Reject contradictions, unsupported claims, truncation, boilerplate, malformed
+rows, or examples that are not useful for training.
+"""
 
-class QualityAssessment(BaseModel):
+
+class PostfilterAssessment(BaseModel):
     is_quality: bool = Field(
         ...,
         description="True if the datapoint satisfies the supplied quality criteria.",
@@ -26,12 +34,12 @@ def _serialize_datapoint(datapoint: Any) -> str:
     return json.dumps(datapoint, ensure_ascii=False, indent=2, sort_keys=True)
 
 
-def _build_quality_messages(
+def _build_postfilter_messages(
     datapoint: Any,
     prompt: str,
 ) -> list[dict[str, str]]:
     if not prompt.strip():
-        raise ValueError("quality_filter requires a non-empty prompt.")
+        raise ValueError("postfilter requires a non-empty prompt.")
 
     return [
         {
@@ -52,35 +60,39 @@ def _build_quality_messages(
     ]
 
 
-def quality_filter(
+def postfilter(
     datapoint: Any,
-    prompt: str,
+    prompt: str | None = None,
     *,
     model: ModelRuntime | None = None,
-) -> QualityAssessment:
+) -> PostfilterAssessment:
     if model is None:
         model = OpenAIModel()
+    if prompt is None:
+        prompt = DEFAULT_POSTFILTER_PROMPT
 
     return model.generate_structured(
-        _build_quality_messages(datapoint, prompt),
-        QualityAssessment,
+        _build_postfilter_messages(datapoint, prompt),
+        PostfilterAssessment,
         temperature=0.0,
         max_tokens=500,
     )
 
 
-async def aquality_filter(
+async def apostfilter(
     datapoint: Any,
-    prompt: str,
+    prompt: str | None = None,
     *,
     model: ModelRuntime | None = None,
-) -> QualityAssessment:
+) -> PostfilterAssessment:
     if model is None:
         model = OpenAIModel(async_mode=True)
+    if prompt is None:
+        prompt = DEFAULT_POSTFILTER_PROMPT
 
     return await model.agenerate_structured(
-        _build_quality_messages(datapoint, prompt),
-        QualityAssessment,
+        _build_postfilter_messages(datapoint, prompt),
+        PostfilterAssessment,
         temperature=0.0,
         max_tokens=500,
     )

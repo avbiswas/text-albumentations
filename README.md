@@ -31,13 +31,21 @@ model = ta.OpenAIModel(
     api_key="sk-...",
 )
 
-# A smart-switch picks the right augmentations and filters low-quality passages:
+# A smart switch picks the right augmentations and prefilters low-quality passages:
 rows = ta.augment("Your passage of text here...", model=model)
 
 # Or choose tasks explicitly:
 rows = ta.augment(
     "Your passage of text here...",
     tasks=["summarize", "qa_pairs", "title"],
+    model=model,
+)
+
+# Or auto-pick only from a whitelist:
+rows = ta.augment(
+    "Your passage of text here...",
+    tasks=["summarize", "qa_pairs", "extractive_qa"],
+    selection_mode="auto",
     model=model,
 )
 
@@ -50,7 +58,7 @@ Model primitives:
 - `ta.LocalMLXModel("mlx-community/...")` — an MLX model loaded in-process (Apple Silicon).
 - `ta.LocalHFModel("Qwen/Qwen3.5-2B")` — a Hugging Face Transformers model loaded in-process.
 
-`ta.list_tasks()` returns every built-in single-passage task name with a one-line hint of when it fits. When you need more control, `tasks=` also accepts configured augmentation instances (e.g. `BulletAugmentation(max_bullets=4)`) — everything below stays available.
+`ta.list_tasks()` returns every built-in single-passage task name with a one-line hint of when it fits. `ta.get_task(...)` and `ta.resolve_tasks(...)` return the augmentation objects when downstream builders want to own scheduling. When you need more control, `tasks=` also accepts configured augmentation instances in explicit mode (e.g. `BulletAugmentation(max_bullets=4)`) — everything below stays available.
 
 Defining your own task takes a schema and a prompt:
 
@@ -120,7 +128,8 @@ The project currently supports:
 
 - **one-call generation**: `ta.augment(text, model=model)` is the whole pipeline
 - **auto-pick (smart switch)**: LLM-driven selection of which augmentations fit a given passage, guided by per-task `selection_hint`s and grammar-constrained to real task names
-- **quality filter**: automatic rejection of low-quality passages before generation
+- **prefilter**: automatic rejection of low-quality passages before generation
+- **postfilter**: optional rejection of low-quality generated training rows after generation
 - **reasoning traces**: post-hoc CoT reasoning generated for each training row
 - **terse custom tasks**: `ta.task(prompt=..., schema=...)` defines a new augmentation without classes
 - single-chunk and multi-chunk augmentations
@@ -170,7 +179,7 @@ The main abstractions are:
   Controls how the Alpaca `output` field is represented and can modify the system prompt with format-specific instructions.
 
 - `MetaAugmentation` (the smart switch)
-  Auto-picks which augmentations to apply — reading each task's `selection_hint` — and filters low-quality passages. Its task choices are grammar-constrained to the actual task names, so it cannot select something that doesn't exist.
+  Auto-picks which augmentations to apply — reading each task's `selection_hint` — and prefilters low-quality passages. Its task choices are grammar-constrained to the actual task names, so it cannot select something that doesn't exist.
 
 ## Usage
 
@@ -238,9 +247,9 @@ model = ta.OpenAIModel("gpt-5-mini", base_url=..., api_key=...,
 
 A new backend is one class away: implement the `ModelRuntime` interface and pass your object anywhere a model is accepted.
 
-### Recommended: Auto-Pick With Quality Filter
+### Recommended: Auto-Pick With Prefilter
 
-The default mode of `ta.augment` is the smart switch: an LLM assesses passage quality (rejecting too-short, nonsensical, or boilerplate text), then selects only the augmentations well-suited to the passage's content and structure.
+The default mode of `ta.augment` is the smart switch: an LLM prefilters passage quality (rejecting too-short, nonsensical, or boilerplate text), then selects only the augmentations well-suited to the passage's content and structure.
 
 ```python
 import text_albumentations as ta
@@ -268,28 +277,35 @@ Each augmentation carries a `selection_hint` — a one-liner describing *when* t
 
 Its choices are grammar-constrained (via a `Literal` over the actual task names), so it cannot hallucinate a task that doesn't exist.
 
-To include custom tasks in auto-pick, use the lower-level `apply_best_augmentations` with `(name, augmentation)` pairs — the hint comes from each augmentation's `selection_hint` attribute (set via `ta.task(..., selection_hint="...")`, a class attribute, or a third tuple element as an override):
+Use `selection_mode="auto"` with `tasks=` to auto-pick only from a whitelist:
 
 ```python
-from text_albumentations import apply_best_augmentations
-from text_albumentations.tasks import bullet_augmentation, summarize_augmentation
-
-key_stat = ta.task(
-    prompt="Extract the single most important statistic from this passage.",
-    schema=KeyStat,
-    output="{statistic} — {context}",
-    selection_hint="the passage contains a notable number or metric.",
-)
-
-rows = apply_best_augmentations(
+rows = ta.augment(
     passage,
-    [
-        ("bullets", bullet_augmentation),
-        ("summarize", summarize_augmentation),
-        ("key_stat", key_stat),
-    ],
-    model,
+    tasks=["qa_pairs", "summarize", "extractive_qa"],
+    selection_mode="auto",
+    model=model,
+    prefilter=True,
 )
+```
+
+Use `select_tasks` when you want to log the prefilter and task-selection decision before generating rows:
+
+```python
+selection = ta.select_tasks(
+    passage,
+    tasks=["qa_pairs", "summarize", "extractive_qa"],
+    model=model,
+    prefilter=True,
+)
+
+print(selection.is_quality, selection.selected_tasks, selection.reasoning)
+```
+
+For downstream builders that want to own scheduling, resolve task objects directly:
+
+```python
+augmentations = ta.resolve_tasks(["qa_pairs", "summarize", "extractive_qa"])
 ```
 
 #### With Reasoning Traces
@@ -302,23 +318,22 @@ rows = ta.augment(passage, model=model, add_reasoning=True)
 
 Each output row gets a `reasoning` field containing a step-by-step logical trace explaining how the response was derived from the passage and instruction.
 
-#### Auto-Pick With Async
+#### High-Level Async
 
 ```python
 import asyncio
 import text_albumentations as ta
-from text_albumentations import aapply_best_augmentations
-from text_albumentations.tasks import bullet_augmentation, qa_pair_augmentation
 
 async def main():
     model = ta.OpenAIModel("gpt-5-mini",
                            base_url="https://api.openai.com/v1",
                            api_key="sk-...",
                            async_mode=True, total_concurrent_calls=4)
-    rows = await aapply_best_augmentations(
+    rows = await ta.aaugment(
         passage,
-        [("bullets", bullet_augmentation), ("qa_pairs", qa_pair_augmentation)],
-        model,
+        tasks=["bullets", "qa_pairs"],
+        selection_mode="auto",
+        model=model,
     )
     print(len(rows))
 
@@ -327,7 +342,7 @@ asyncio.run(main())
 
 ### Choosing Tasks Explicitly
 
-Pass `tasks=` to skip the smart switch. Names and configured instances mix freely:
+Pass `tasks=` to skip the smart switch. Names and configured instances mix freely in explicit mode:
 
 ```python
 from text_albumentations.tasks.bullets import BulletAugmentation
@@ -341,13 +356,28 @@ rows = ta.augment(
 
 `ta.list_tasks()` returns every built-in task name with its selection hint. The lower-level equivalent is `run_augmentation(passage, augmentation, model)` for one augmentation at a time.
 
-Note: `ta.augment` operates on a single passage, so it covers the single-chunk tasks. The multi-chunk tasks (`comparison`, `retrieval`) take a list of passages and run through `run_augmentation` directly:
+For stochastic dataset mixtures, pass probabilities with `selection_mode="sample"`. Each task is sampled independently, and `[]` is returned if none are sampled:
+
+```python
+rows = ta.augment(
+    passage,
+    tasks={
+        "qa_pairs": 0.25,
+        "summarize": 0.25,
+        "extractive_qa": 0.25,
+        "classification": 0.10,
+    },
+    selection_mode="sample",
+    model=model,
+)
+```
+
+Note: `ta.augment` operates on a single passage, so it covers the single-chunk tasks. The multi-chunk tasks (`comparison`, `retrieval`) take a list of passages and run through `run_augmentation` directly. Use `ta.list_multi_tasks()`, `ta.get_multi_task(...)`, and `ta.resolve_multi_tasks(...)` for stable named access:
 
 ```python
 from text_albumentations import run_augmentation
-from text_albumentations.tasks import comparison_augmentation
 
-rows = run_augmentation([passage_a, passage_b], comparison_augmentation, model)
+rows = run_augmentation([passage_a, passage_b], ta.get_multi_task("comparison"), model)
 ```
 
 ### Reasoning Traces (Standalone)
@@ -369,12 +399,12 @@ Each row gets a `reasoning` field with a Chain-of-Thought trace. Available funct
 | `add_reasoning_to_dataset(passage, dataset, model)` | Add reasoning to all rows |
 | `agenerate_reasoning(...)` / `aadd_reasoning_to_dataset(...)` | Async variants |
 
-### Quality Filter (Standalone)
+### Postfilter (Standalone)
 
-Use `ta.quality_filter(...)` to judge one datapoint against your own quality criteria. The datapoint can be a string or JSON-like Python value, and the result is a typed `QualityAssessment` with `is_quality` and `reason` fields:
+Use `ta.postfilter(...)` to judge one generated training datapoint against your own quality criteria. The datapoint can be a string or JSON-like Python value, and the result is a typed `PostfilterAssessment` with `is_quality` and `reason` fields:
 
 ```python
-assessment = ta.quality_filter(
+assessment = ta.postfilter(
     {
         "instruction": "Answer the question.",
         "input": "What does the Transformer replace?",
@@ -390,7 +420,14 @@ else:
     print(assessment.reason)
 ```
 
-Async pipelines can use `await ta.aquality_filter(...)`.
+Async pipelines can use `await ta.apostfilter(...)`.
+
+High-level `augment` / `aaugment` can also postfilter generated rows before returning them:
+
+```python
+rows = ta.augment(passage, model=model, postfilter=True)
+rows = await ta.aaugment(passage, model=model, postfilter=True)
+```
 
 ### Batch Augmentation Over Multiple Passages
 

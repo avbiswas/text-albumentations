@@ -9,7 +9,7 @@ from typing import Any
 from openai import AsyncOpenAI
 from datasets import load_dataset
 
-from text_albumentations.quality import QualityAssessment
+from text_albumentations.postfilter import PostfilterAssessment
 
 
 DATASET_NAME = "paperbd/paper_instructions_300K-v1"
@@ -33,7 +33,7 @@ too noisy, or not useful as a training example.
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Filter paperbd/paper_instructions_300K-v1 with ta.quality_filter."
+        description="Filter paperbd/paper_instructions_300K-v1 with a datapoint postfilter."
     )
     parser.add_argument("--dataset", default=DATASET_NAME)
     parser.add_argument("--model", default=MODEL_NAME)
@@ -41,6 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-key", default="local")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--concurrency", type=int, default=4)
+    parser.add_argument("--max-tokens", type=int, default=512)
     parser.add_argument("--max-rows-per-split", type=int, default=None)
     parser.add_argument("--prompt-file", type=Path, default=None)
     parser.add_argument("--splits", nargs="+", default=["train", "test"])
@@ -58,6 +59,15 @@ def parse_args() -> argparse.Namespace:
         "--response-format",
         choices=["json_object", "json_schema", "none"],
         default="json_object",
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=["none", "minimal", "low", "medium", "high", "xhigh", "unset"],
+        default="low",
+        help=(
+            "OpenAI/OpenRouter reasoning effort. Use 'unset' to omit the "
+            "parameter entirely."
+        ),
     )
     parser.add_argument(
         "--no-require-parameters",
@@ -194,6 +204,8 @@ async def judge_row(
     model: str,
     response_format: str,
     require_parameters: bool,
+    reasoning_effort: str,
+    max_tokens: int,
 ) -> dict[str, Any]:
     last_error: Exception | None = None
     for attempt in range(3):
@@ -205,12 +217,17 @@ async def judge_row(
                 request_response_format = {
                     "type": "json_schema",
                     "json_schema": {
-                        "name": "QualityAssessment",
+                        "name": "PostfilterAssessment",
                         "strict": True,
-                        "schema": QualityAssessment.model_json_schema(),
+                        "schema": PostfilterAssessment.model_json_schema(),
                     },
                 }
 
+            reasoning_kwargs = (
+                {"reasoning_effort": reasoning_effort}
+                if reasoning_effort != "unset"
+                else {}
+            )
             response = await client.chat.completions.create(
                 model=model,
                 messages=[
@@ -233,7 +250,8 @@ async def judge_row(
                 ],
                 response_format=request_response_format,
                 temperature=0,
-                max_tokens=128,
+                max_tokens=max_tokens,
+                **reasoning_kwargs,
                 extra_body=(
                     {"provider": {"require_parameters": True}}
                     if require_parameters
@@ -243,7 +261,7 @@ async def judge_row(
             if not response.choices:
                 raise ValueError(f"Model response had no choices: {response}")
             content = response.choices[0].message.content or ""
-            assessment = QualityAssessment.model_validate(extract_json_object(content))
+            assessment = PostfilterAssessment.model_validate(extract_json_object(content))
             break
         except Exception as error:
             last_error = error
@@ -280,6 +298,8 @@ async def filter_split(
     concurrency: int,
     max_rows: int | None,
     dataset_loading: str,
+    reasoning_effort: str,
+    max_tokens: int,
 ) -> None:
     kept_path = output_dir / f"{split}.jsonl"
     rejected_path = output_dir / f"{split}.rejected.jsonl"
@@ -319,6 +339,8 @@ async def filter_split(
                 model=model,
                 response_format=response_format,
                 require_parameters=require_parameters,
+                reasoning_effort=reasoning_effort,
+                max_tokens=max_tokens,
             )
 
     async def drain_one(
@@ -395,6 +417,8 @@ async def main() -> None:
         "splits": args.splits,
         "dataset_loading": args.dataset_loading,
         "response_format": args.response_format,
+        "reasoning_effort": args.reasoning_effort,
+        "max_tokens": args.max_tokens,
         "require_parameters": not args.no_require_parameters,
         "prompt": prompt,
     }
@@ -415,6 +439,8 @@ async def main() -> None:
             concurrency=args.concurrency,
             max_rows=args.max_rows_per_split,
             dataset_loading=args.dataset_loading,
+            reasoning_effort=args.reasoning_effort,
+            max_tokens=args.max_tokens,
         )
 
 

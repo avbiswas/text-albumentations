@@ -90,7 +90,7 @@ class MetaAugmentation(BaseSingleChunkAugmentation[MetaSelection]):
         self,
         augmentations: list[AugmentationEntry],
         *,
-        enable_quality_filter: bool = True,
+        prefilter: bool = True,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -113,7 +113,7 @@ class MetaAugmentation(BaseSingleChunkAugmentation[MetaSelection]):
         # Constrain `selected` to the actual augmentation names so the
         # selector cannot hallucinate a task that does not exist.
         self.schema = _build_selection_schema(tuple(self._aug_map))
-        self.enable_quality_filter = enable_quality_filter
+        self.prefilter = prefilter
 
     def build_messages(
         self,
@@ -133,7 +133,7 @@ class MetaAugmentation(BaseSingleChunkAugmentation[MetaSelection]):
         validated = self.validate_passages(passages)
         selection = self.generate_one(validated, runtime)
 
-        if self.enable_quality_filter and selection.is_low_quality:
+        if self.prefilter and selection.is_low_quality:
             return []
 
         dataset: list[AlpacaDataset] = []
@@ -151,7 +151,7 @@ class MetaAugmentation(BaseSingleChunkAugmentation[MetaSelection]):
         validated = self.validate_passages(passages)
         selection = await self.agenerate_one(validated, runtime)
 
-        if self.enable_quality_filter and selection.is_low_quality:
+        if self.prefilter and selection.is_low_quality:
             return []
 
         dataset: list[AlpacaDataset] = []
@@ -167,12 +167,12 @@ def apply_best_augmentations(
     augmentations: list[AugmentationEntry],
     runtime: ModelRuntime,
     *,
-    enable_quality_filter: bool = True,
+    prefilter: bool = True,
     add_reasoning: bool = False,
 ) -> list[AlpacaDataset]:
     meta = MetaAugmentation(
         augmentations,
-        enable_quality_filter=enable_quality_filter,
+        prefilter=prefilter,
     )
     dataset = run_augmentation(passage, meta, runtime)
     if add_reasoning:
@@ -186,12 +186,12 @@ async def aapply_best_augmentations(
     augmentations: list[AugmentationEntry],
     runtime: ModelRuntime,
     *,
-    enable_quality_filter: bool = True,
+    prefilter: bool = True,
     add_reasoning: bool = False,
 ) -> list[AlpacaDataset]:
     meta = MetaAugmentation(
         augmentations,
-        enable_quality_filter=enable_quality_filter,
+        prefilter=prefilter,
     )
     dataset = await arun_augmentation(passage, meta, runtime)
     if add_reasoning:
