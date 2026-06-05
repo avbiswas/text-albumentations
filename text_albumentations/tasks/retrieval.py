@@ -1,6 +1,6 @@
+import asyncio
 import json
 import random
-import asyncio
 
 from pydantic import BaseModel, Field
 
@@ -201,16 +201,99 @@ class RetrievalAugmentation(BaseMultiChunkAugmentation[UniqueQuestions]):
     system_prompt = QUESTION_EXTRACTION_PROMPT
     temperature = 0.2
 
+    def __init__(
+        self,
+        *,
+        max_questions_per_passage: int | None = None,
+        max_passages: int | None = None,
+        include_negative_examples: bool = True,
+        **kwargs,
+    ) -> None:
+        if max_questions_per_passage is not None and max_questions_per_passage <= 0:
+            raise ValueError("max_questions_per_passage must be greater than 0.")
+        if max_passages is not None and max_passages <= 0:
+            raise ValueError("max_passages must be greater than 0.")
+
+        super().__init__(**kwargs)
+        self.max_questions_per_passage = max_questions_per_passage
+        self.max_passages = max_passages
+        self.include_negative_examples = include_negative_examples
+
     def build_user_message(self, passages: list[str]) -> str:
         return format_passages(passages)
+
+    def _prepare_passages(self, passages: list[str]) -> list[str]:
+        shuffled_passages = passages[:]
+        random.shuffle(shuffled_passages)
+        if self.max_passages is not None:
+            return shuffled_passages[: self.max_passages]
+        return shuffled_passages
+
+    def _limit_questions(self, questions: list[str]) -> list[str]:
+        if self.max_questions_per_passage is None:
+            return questions
+        return questions[: self.max_questions_per_passage]
+
+    def _build_positive_rows(
+        self,
+        passages: list[str],
+        correct_idx: int,
+        question: str,
+        reason: str,
+    ) -> list[AlpacaDataset]:
+        full_input = build_retrieval_input(passages, question)
+        return [
+            AlpacaDataset(
+                instruction=RETRIEVAL_INSTRUCTION,
+                input=full_input,
+                output=build_retrieval_output(correct_idx, reason),
+            ),
+            AlpacaDataset(
+                instruction=RETRIEVAL_JSON_INSTRUCTION,
+                input=full_input,
+                output=build_retrieval_json_output(correct_idx, reason),
+            ),
+        ]
+
+    def _build_negative_rows(
+        self,
+        negative_passages: list[str],
+        question: str,
+        reason: str,
+    ) -> list[AlpacaDataset]:
+        negative_input = build_retrieval_input(negative_passages, question)
+        return [
+            AlpacaDataset(
+                instruction=RETRIEVAL_INSTRUCTION,
+                input=negative_input,
+                output=build_no_answer_output(reason),
+            ),
+            AlpacaDataset(
+                instruction=RETRIEVAL_JSON_INSTRUCTION,
+                input=negative_input,
+                output=build_no_answer_json_output(reason),
+            ),
+        ]
+
+    def _negative_passages(
+        self,
+        passages: list[str],
+        correct_idx: int,
+    ) -> list[str]:
+        if not self.include_negative_examples:
+            return []
+        return [
+            passage
+            for idx, passage in enumerate(passages)
+            if idx != correct_idx
+        ]
 
     def build_dataset(
         self,
         passages: list[str],
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
-        shuffled_passages = passages[:]
-        random.shuffle(shuffled_passages)
+        shuffled_passages = self._prepare_passages(passages)
 
         extracted_questions = [
             extract_unique_questions(passage, runtime)
@@ -219,40 +302,26 @@ class RetrievalAugmentation(BaseMultiChunkAugmentation[UniqueQuestions]):
 
         dataset = []
         for correct_idx, questions_for_passage in enumerate(extracted_questions):
-            for question in questions_for_passage.questions:
+            for question in self._limit_questions(questions_for_passage.questions):
                 positive_reason = generate_retrieval_reason(
                     shuffled_passages[correct_idx],
                     question,
                     runtime,
                 )
 
-                full_input = build_retrieval_input(shuffled_passages, question)
                 dataset.extend(
-                    [
-                        AlpacaDataset(
-                            instruction=RETRIEVAL_INSTRUCTION,
-                            input=full_input,
-                            output=build_retrieval_output(
-                                correct_idx,
-                                positive_reason.why,
-                            ),
-                        ),
-                        AlpacaDataset(
-                            instruction=RETRIEVAL_JSON_INSTRUCTION,
-                            input=full_input,
-                            output=build_retrieval_json_output(
-                                correct_idx,
-                                positive_reason.why,
-                            ),
-                        ),
-                    ]
+                    self._build_positive_rows(
+                        shuffled_passages,
+                        correct_idx,
+                        question,
+                        positive_reason.why,
+                    )
                 )
 
-                negative_passages = [
-                    passage
-                    for idx, passage in enumerate(shuffled_passages)
-                    if idx != correct_idx
-                ]
+                negative_passages = self._negative_passages(
+                    shuffled_passages,
+                    correct_idx,
+                )
                 if not negative_passages:
                     continue
 
@@ -261,20 +330,12 @@ class RetrievalAugmentation(BaseMultiChunkAugmentation[UniqueQuestions]):
                     question,
                     runtime,
                 )
-                negative_input = build_retrieval_input(negative_passages, question)
                 dataset.extend(
-                    [
-                        AlpacaDataset(
-                            instruction=RETRIEVAL_INSTRUCTION,
-                            input=negative_input,
-                            output=build_no_answer_output(negative_reason.why),
-                        ),
-                        AlpacaDataset(
-                            instruction=RETRIEVAL_JSON_INSTRUCTION,
-                            input=negative_input,
-                            output=build_no_answer_json_output(negative_reason.why),
-                        ),
-                    ]
+                    self._build_negative_rows(
+                        negative_passages,
+                        question,
+                        negative_reason.why,
+                    )
                 )
 
         return dataset
@@ -284,8 +345,7 @@ class RetrievalAugmentation(BaseMultiChunkAugmentation[UniqueQuestions]):
         passages: list[str],
         runtime: ModelRuntime,
     ) -> list[AlpacaDataset]:
-        shuffled_passages = passages[:]
-        random.shuffle(shuffled_passages)
+        shuffled_passages = self._prepare_passages(passages)
 
         extracted_questions = await asyncio.gather(
             *[
@@ -294,64 +354,65 @@ class RetrievalAugmentation(BaseMultiChunkAugmentation[UniqueQuestions]):
             ]
         )
 
-        dataset = []
+        reason_jobs = []
         for correct_idx, questions_for_passage in enumerate(extracted_questions):
-            for question in questions_for_passage.questions:
-                positive_reason = await agenerate_retrieval_reason(
-                    shuffled_passages[correct_idx],
-                    question,
-                    runtime,
+            for question in self._limit_questions(questions_for_passage.questions):
+                reason_jobs.append(
+                    (
+                        "positive",
+                        shuffled_passages,
+                        correct_idx,
+                        question,
+                        agenerate_retrieval_reason(
+                            shuffled_passages[correct_idx],
+                            question,
+                            runtime,
+                        ),
+                    )
                 )
 
-                full_input = build_retrieval_input(shuffled_passages, question)
-                dataset.extend(
-                    [
-                        AlpacaDataset(
-                            instruction=RETRIEVAL_INSTRUCTION,
-                            input=full_input,
-                            output=build_retrieval_output(
-                                correct_idx,
-                                positive_reason.why,
-                            ),
-                        ),
-                        AlpacaDataset(
-                            instruction=RETRIEVAL_JSON_INSTRUCTION,
-                            input=full_input,
-                            output=build_retrieval_json_output(
-                                correct_idx,
-                                positive_reason.why,
-                            ),
-                        ),
-                    ]
+                negative_passages = self._negative_passages(
+                    shuffled_passages,
+                    correct_idx,
                 )
-
-                negative_passages = [
-                    passage
-                    for idx, passage in enumerate(shuffled_passages)
-                    if idx != correct_idx
-                ]
                 if not negative_passages:
                     continue
 
-                negative_reason = await agenerate_no_answer_reason(
-                    negative_passages,
-                    question,
-                    runtime,
+                reason_jobs.append(
+                    (
+                        "negative",
+                        negative_passages,
+                        correct_idx,
+                        question,
+                        agenerate_no_answer_reason(
+                            negative_passages,
+                            question,
+                            runtime,
+                        ),
+                    )
                 )
-                negative_input = build_retrieval_input(negative_passages, question)
+
+        reasons = await asyncio.gather(*[job[-1] for job in reason_jobs])
+
+        dataset = []
+        for job, reason in zip(reason_jobs, reasons):
+            kind, job_passages, correct_idx, question, _ = job
+            if kind == "positive":
                 dataset.extend(
-                    [
-                        AlpacaDataset(
-                            instruction=RETRIEVAL_INSTRUCTION,
-                            input=negative_input,
-                            output=build_no_answer_output(negative_reason.why),
-                        ),
-                        AlpacaDataset(
-                            instruction=RETRIEVAL_JSON_INSTRUCTION,
-                            input=negative_input,
-                            output=build_no_answer_json_output(negative_reason.why),
-                        ),
-                    ]
+                    self._build_positive_rows(
+                        job_passages,
+                        correct_idx,
+                        question,
+                        reason.why,
+                    )
+                )
+            else:
+                dataset.extend(
+                    self._build_negative_rows(
+                        job_passages,
+                        question,
+                        reason.why,
+                    )
                 )
 
         return dataset

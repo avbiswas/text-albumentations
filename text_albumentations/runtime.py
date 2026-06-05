@@ -14,7 +14,7 @@ from pydantic_core import ValidationError
 OutputT = TypeVar("OutputT", bound=BaseModel)
 
 DEFAULT_MODEL_NAME = "mlx-community/Qwen3.5-4B-OptiQ-4bit"
-DEFAULT_OPENAI_CONCURRENCY = 10
+DEFAULT_OPENAI_CONCURRENCY = 100
 _OPENAI_ASYNC_SEMAPHORE: asyncio.Semaphore | None = None
 _OPENAI_ASYNC_SEMAPHORE_LIMIT: int | None = None
 

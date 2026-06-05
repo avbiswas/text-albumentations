@@ -20,7 +20,11 @@ from text_albumentations.base import (
     BaseSingleChunkAugmentation,
 )
 from text_albumentations.output_format_adapters import BaseAlpacaAdapter
-from text_albumentations.meta import MetaAugmentation
+from text_albumentations.meta import (
+    MetaAugmentation,
+    aprefilter_passage,
+    prefilter_passage,
+)
 from text_albumentations.models import OpenAIModel
 from text_albumentations.postfilter import apostfilter, postfilter
 from text_albumentations.reasoning import (
@@ -32,10 +36,25 @@ from text_albumentations.runtime import ModelRuntime
 from text_albumentations.utils import AlpacaDataset, save_dataset
 
 SelectionMode = Literal["auto", "explicit", "sample"]
+TaskName = Literal[
+    "backtranslation",
+    "bullets",
+    "classification",
+    "cloze",
+    "continuation",
+    "counterfactual",
+    "extractive_qa",
+    "qa_pairs",
+    "rephrase",
+    "style_transfer",
+    "summarize",
+    "title",
+    "triplets",
+]
 TaskSpec = (
-    list[str | BaseSingleChunkAugmentation]
-    | tuple[str | BaseSingleChunkAugmentation, ...]
-    | dict[str, float]
+    list[TaskName | BaseSingleChunkAugmentation]
+    | tuple[TaskName | BaseSingleChunkAugmentation, ...]
+    | dict[TaskName, float]
     | None
 )
 
@@ -49,14 +68,7 @@ unsupported claims, truncation, or malformed boilerplate.
 
 @dataclass(frozen=True)
 class TaskSelection:
-    is_low_quality: bool
-    low_quality_reason: str
-    selected_tasks: list[str]
-    reasoning: str
-
-    @property
-    def is_quality(self) -> bool:
-        return not self.is_low_quality
+    selected_tasks: list[TaskName]
 
 
 def _build_task_registry() -> dict[str, BaseSingleChunkAugmentation]:
@@ -91,8 +103,7 @@ def _build_multi_task_registry() -> dict[str, BaseMultiChunkAugmentation]:
 def list_tasks() -> dict[str, str]:
     """Names and selection hints of all built-in single-passage tasks."""
     return {
-        name: aug.selection_hint or ""
-        for name, aug in _build_task_registry().items()
+        name: aug.selection_hint or "" for name, aug in _build_task_registry().items()
     }
 
 
@@ -200,15 +211,19 @@ def task(
         _FunctionTask.selection_hint = selection_hint
     if instruction_variants is not None:
         if rows is not None:
-            raise ValueError("instruction_variants are only supported with instruction/output rows.")
+            raise ValueError(
+                "instruction_variants are only supported with instruction/output rows."
+            )
         _FunctionTask.instruction_templates = {
-            row_instruction: tuple(dict.fromkeys([row_instruction, *instruction_variants]))
+            row_instruction: tuple(
+                dict.fromkeys([row_instruction, *instruction_variants])
+            )
         }
     return _FunctionTask(**augmentation_kwargs)
 
 
 def resolve_tasks(
-    tasks: list[str | BaseSingleChunkAugmentation],
+    tasks: list[TaskName | BaseSingleChunkAugmentation],
 ) -> list[BaseSingleChunkAugmentation]:
     registry = _build_task_registry()
     resolved = []
@@ -232,7 +247,9 @@ def resolve_multi_tasks(
     return resolved
 
 
-def _infer_selection_mode(tasks: TaskSpec, selection_mode: SelectionMode | None) -> SelectionMode:
+def _infer_selection_mode(
+    tasks: TaskSpec, selection_mode: SelectionMode | None
+) -> SelectionMode:
     if selection_mode is not None:
         return selection_mode
     if tasks is None:
@@ -243,7 +260,7 @@ def _infer_selection_mode(tasks: TaskSpec, selection_mode: SelectionMode | None)
 
 
 def _task_entries(
-    tasks: list[str] | tuple[str, ...] | None,
+    tasks: list[TaskName] | tuple[TaskName, ...] | None,
 ) -> list[tuple[str, BaseSingleChunkAugmentation]]:
     registry = _build_task_registry()
     if tasks is None:
@@ -256,7 +273,7 @@ def _task_entries(
     return entries
 
 
-def _sample_task_names(tasks: dict[str, float]) -> list[str]:
+def _sample_task_names(tasks: dict[TaskName, float]) -> list[TaskName]:
     selected = []
     for name, probability in tasks.items():
         if probability < 0 or probability > 1:
@@ -311,42 +328,34 @@ async def _afilter_rows(
 
 def select_tasks(
     text: str,
-    tasks: list[str] | tuple[str, ...] | None = None,
+    tasks: list[TaskName] | tuple[TaskName, ...] | None = None,
     *,
     model: ModelRuntime | None = None,
     prefilter: bool = True,
 ) -> TaskSelection:
     if model is None:
         model = OpenAIModel()
-    meta = MetaAugmentation(_task_entries(tasks), prefilter=prefilter)
+    if prefilter and not prefilter_passage(text, model):
+        return TaskSelection(selected_tasks=[])
+    meta = MetaAugmentation(_task_entries(tasks))
     selection = meta.generate_one(text, model)
-    selected = [] if prefilter and selection.is_low_quality else selection.selected
-    return TaskSelection(
-        is_low_quality=selection.is_low_quality,
-        low_quality_reason=selection.low_quality_reason,
-        selected_tasks=list(selected),
-        reasoning=selection.reasoning,
-    )
+    return TaskSelection(selected_tasks=list(selection.selected))
 
 
 async def aselect_tasks(
     text: str,
-    tasks: list[str] | tuple[str, ...] | None = None,
+    tasks: list[TaskName] | tuple[TaskName, ...] | None = None,
     *,
     model: ModelRuntime | None = None,
     prefilter: bool = True,
 ) -> TaskSelection:
     if model is None:
         model = OpenAIModel(async_mode=True)
-    meta = MetaAugmentation(_task_entries(tasks), prefilter=prefilter)
+    if prefilter and not await aprefilter_passage(text, model):
+        return TaskSelection(selected_tasks=[])
+    meta = MetaAugmentation(_task_entries(tasks))
     selection = await meta.agenerate_one(text, model)
-    selected = [] if prefilter and selection.is_low_quality else selection.selected
-    return TaskSelection(
-        is_low_quality=selection.is_low_quality,
-        low_quality_reason=selection.low_quality_reason,
-        selected_tasks=list(selected),
-        reasoning=selection.reasoning,
-    )
+    return TaskSelection(selected_tasks=list(selection.selected))
 
 
 def augment(
@@ -413,8 +422,11 @@ def augment(
     elif mode == "sample":
         if not isinstance(tasks, dict):
             raise TypeError("selection_mode='sample' requires a probability map.")
+        sampled_names = _sample_task_names(tasks)
+        if not sampled_names or (prefilter and not prefilter_passage(text, model)):
+            return []
         dataset = []
-        for augmentation in resolve_tasks(_sample_task_names(tasks)):
+        for augmentation in resolve_tasks(sampled_names):
             dataset.extend(
                 run_augmentation(
                     text,
@@ -470,7 +482,12 @@ async def aaugment(
     elif mode == "sample":
         if not isinstance(tasks, dict):
             raise TypeError("selection_mode='sample' requires a probability map.")
-        augmentations = resolve_tasks(_sample_task_names(tasks))
+        sampled_names = _sample_task_names(tasks)
+        if not sampled_names or (
+            prefilter and not await aprefilter_passage(text, model)
+        ):
+            return []
+        augmentations = resolve_tasks(sampled_names)
     else:
         raise ValueError("selection_mode must be one of: auto, explicit, sample.")
 

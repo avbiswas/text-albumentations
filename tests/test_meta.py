@@ -20,21 +20,11 @@ def meta() -> MetaAugmentation:
 
 def test_selected_is_constrained_to_real_names(meta):
     schema = meta.get_schema()
-    selection = schema(
-        is_low_quality=False,
-        low_quality_reason="",
-        selected=["title"],
-        reasoning="",
-    )
+    selection = schema(selected=["title"])
     assert selection.selected == ["title"]
 
     with pytest.raises(ValidationError):
-        schema(
-            is_low_quality=False,
-            low_quality_reason="",
-            selected=["hallucinated_task"],
-            reasoning="",
-        )
+        schema(selected=["hallucinated_task"])
 
 
 def test_selection_prompt_built_from_hints(meta):

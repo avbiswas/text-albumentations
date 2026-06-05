@@ -138,7 +138,7 @@ The project currently supports:
 
 - **one-call generation**: `ta.augment(text, model=model)` is the whole pipeline
 - **auto-pick (smart switch)**: LLM-driven selection of which augmentations fit a given passage, guided by per-task `selection_hint`s and grammar-constrained to real task names
-- **prefilter**: automatic rejection of low-quality passages before generation
+- **prefilter**: lightweight dedicated LLM call (`PassageQuality`) that rejects low-quality passages before any generation runs — active in both `auto` and `sample` modes
 - **postfilter**: optional rejection of low-quality generated training rows after generation
 - **reasoning traces**: post-hoc CoT reasoning generated for each training row
 - **terse custom tasks**: `ta.task(prompt=..., schema=...)` defines a new augmentation without classes
@@ -188,8 +188,11 @@ The main abstractions are:
 - `BaseResponseFormat`
   Controls how the Alpaca `output` field is represented and can modify the system prompt with format-specific instructions.
 
+- `PassageQuality` / `prefilter_passage` (the quality gate)
+  A single tiny structured call (`is_quality: bool`, `max_tokens=20`) that runs before any generation. Used by both `auto` and `sample` modes when `prefilter=True`. Cheap enough to run on every passage without burning generation budget.
+
 - `MetaAugmentation` (the smart switch)
-  Auto-picks which augmentations to apply — reading each task's `selection_hint` — and prefilters low-quality passages. Its task choices are grammar-constrained to the actual task names, so it cannot select something that doesn't exist.
+  Auto-picks which augmentations to apply, reading each task's `selection_hint`. Runs only after the passage passes the quality gate. Its task choices are grammar-constrained to the actual task names, so it cannot select something that doesn't exist.
 
 ## Usage
 
@@ -254,12 +257,15 @@ For async pipelines, `OpenAIModel` takes `async_mode=True` and `total_concurrent
 model = ta.OpenAIModel("gpt-5-mini", base_url=..., api_key=...,
                        async_mode=True, total_concurrent_calls=4)
 ```
+The default async OpenAI concurrency is 100. For local OpenAI-compatible
+servers, keep this lower unless you have capacity to spare; around 8 is a
+reasonable starting point.
 
 A new backend is one class away: implement the `ModelRuntime` interface and pass your object anywhere a model is accepted.
 
 ### Recommended: Auto-Pick With Prefilter
 
-The default mode of `ta.augment` is the smart switch: an LLM prefilters passage quality (rejecting too-short, nonsensical, or boilerplate text), then selects only the augmentations well-suited to the passage's content and structure.
+The default mode of `ta.augment` is the smart switch. First, a lightweight `PassageQuality` call rejects passages that are too short, nonsensical, or boilerplate — with `max_tokens=20`, it costs almost nothing. If the passage passes, a second call (`MetaAugmentation`) selects only the augmentations well-suited to the passage's content and structure.
 
 ```python
 import text_albumentations as ta
@@ -309,7 +315,7 @@ selection = ta.select_tasks(
     prefilter=True,
 )
 
-print(selection.is_quality, selection.selected_tasks, selection.reasoning)
+print(selection.selected_tasks)
 ```
 
 For downstream builders that want to own scheduling, resolve task objects directly:
@@ -366,7 +372,7 @@ rows = ta.augment(
 
 `ta.list_tasks()` returns every built-in task name with its selection hint. The lower-level equivalent is `run_augmentation(passage, augmentation, model)` for one augmentation at a time.
 
-For stochastic dataset mixtures, pass probabilities with `selection_mode="sample"`. Each task is sampled independently, and `[]` is returned if none are sampled:
+For stochastic dataset mixtures, pass probabilities with `selection_mode="sample"`. Each task is sampled independently. The lightweight `PassageQuality` prefilter still runs (unless `prefilter=False`), so garbage passages bail before any generation calls. `[]` is returned if no tasks are sampled or the passage fails the quality gate:
 
 ```python
 rows = ta.augment(
@@ -407,6 +413,21 @@ Note: `ta.augment` operates on a single passage, so it covers the single-chunk t
 from text_albumentations import run_augmentation
 
 rows = run_augmentation([passage_a, passage_b], ta.get_multi_task("comparison"), model)
+```
+
+Retrieval can generate many internal model calls because it extracts questions
+and then writes positive and no-answer reasons. Use `RetrievalAugmentation` to
+cap work for high-throughput runs:
+
+```python
+from text_albumentations.tasks.retrieval import RetrievalAugmentation
+
+retrieval = RetrievalAugmentation(
+    max_questions_per_passage=2,
+    max_passages=8,
+    include_negative_examples=False,
+)
+rows = run_augmentation(passages, retrieval, model)
 ```
 
 ### Reasoning Traces (Standalone)

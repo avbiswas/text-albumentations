@@ -5,7 +5,7 @@ import json
 import pytest
 
 import text_albumentations as ta
-from text_albumentations.meta import MetaSelection
+from text_albumentations.meta import MetaSelection, PassageQuality
 from text_albumentations.postfilter import PostfilterAssessment
 from text_albumentations.reasoning import ReasoningTrace
 from text_albumentations.tasks.style_transfer import StyleRewrite, StyleTransferAugmentation
@@ -94,12 +94,8 @@ def test_augment_mixes_names_and_instances(passage):
 def test_augment_auto_mode_runs_selected_tasks(passage):
     model = FakeModel(
         {
-            "MetaSelection": MetaSelection(
-                is_low_quality=False,
-                low_quality_reason="",
-                selected=["title"],
-                reasoning="title fits",
-            ),
+            "PassageQuality": PassageQuality(is_quality=True),
+            "MetaSelection": MetaSelection(selected=["title"]),
             "TitleHeadline": TitleHeadline(title="T", headline="H"),
         }
     )
@@ -110,12 +106,8 @@ def test_augment_auto_mode_runs_selected_tasks(passage):
 def test_augment_auto_mode_uses_task_whitelist(passage):
     model = FakeModel(
         {
-            "MetaSelection": MetaSelection(
-                is_low_quality=False,
-                low_quality_reason="",
-                selected=["title"],
-                reasoning="title fits",
-            ),
+            "PassageQuality": PassageQuality(is_quality=True),
+            "MetaSelection": MetaSelection(selected=["title"]),
             "TitleHeadline": TitleHeadline(title="T", headline="H"),
         }
     )
@@ -126,7 +118,8 @@ def test_augment_auto_mode_uses_task_whitelist(passage):
         model=model,
     )
     assert [row.output for row in rows] == ["T", "H"]
-    selection_prompt = model.calls[0][0][0]["content"]
+    # calls[0] is PassageQuality; calls[1] is MetaSelection
+    selection_prompt = model.calls[1][0][0]["content"]
     assert "- title:" in selection_prompt
     assert "- summarize:" in selection_prompt
     assert "- bullets:" not in selection_prompt
@@ -135,12 +128,8 @@ def test_augment_auto_mode_uses_task_whitelist(passage):
 def test_select_tasks_returns_inspectable_selection(passage):
     model = FakeModel(
         {
-            "MetaSelection": MetaSelection(
-                is_low_quality=False,
-                low_quality_reason="",
-                selected=["title"],
-                reasoning="title fits",
-            ),
+            "PassageQuality": PassageQuality(is_quality=True),
+            "MetaSelection": MetaSelection(selected=["title"]),
         }
     )
     selection = ta.select_tasks(
@@ -148,45 +137,37 @@ def test_select_tasks_returns_inspectable_selection(passage):
         tasks=["title", "summarize"],
         model=model,
     )
-    assert selection.is_quality is True
-    assert selection.is_low_quality is False
     assert selection.selected_tasks == ["title"]
-    assert selection.reasoning == "title fits"
 
 
 def test_augment_auto_mode_quality_gate_rejects(passage):
-    model = FakeModel(
-        {
-            "MetaSelection": MetaSelection(
-                is_low_quality=True,
-                low_quality_reason="junk",
-                selected=[],
-                reasoning="",
-            ),
-        }
-    )
+    # Quality gate now uses the lightweight PassageQuality check
+    model = FakeModel({"PassageQuality": PassageQuality(is_quality=False)})
     assert ta.augment("asdf qwerty", model=model) == []
+    # MetaSelection must never be called when the prefilter rejects
+    assert all(call[1] != "MetaSelection" for call in model.calls)
 
 
-def test_augment_prefilter_false_keeps_selected_tasks_for_low_quality_text(passage):
+def test_augment_prefilter_false_skips_quality_check_in_auto_mode(passage):
     model = FakeModel(
         {
-            "MetaSelection": MetaSelection(
-                is_low_quality=True,
-                low_quality_reason="junk",
-                selected=["title"],
-                reasoning="title still requested",
-            ),
+            "MetaSelection": MetaSelection(selected=["title"]),
             "TitleHeadline": TitleHeadline(title="T", headline="H"),
         }
     )
-    rows = ta.augment("asdf qwerty", model=model, prefilter=False)
+    rows = ta.augment(passage, model=model, prefilter=False)
     assert [row.output for row in rows] == ["T", "H"]
+    assert all(call[1] != "PassageQuality" for call in model.calls)
 
 
 def test_augment_sample_mode(monkeypatch, passage):
     monkeypatch.setattr("text_albumentations.easy.random.random", lambda: 0.2)
-    model = FakeModel({"TitleHeadline": TitleHeadline(title="T", headline="H")})
+    model = FakeModel(
+        {
+            "PassageQuality": PassageQuality(is_quality=True),
+            "TitleHeadline": TitleHeadline(title="T", headline="H"),
+        }
+    )
 
     rows = ta.augment(
         passage,
@@ -204,7 +185,7 @@ def test_augment_sample_mode_can_return_empty(monkeypatch, passage):
         passage,
         tasks={"title": 0.25},
         selection_mode="sample",
-        model=FakeModel({}),
+        model=FakeModel({"PassageQuality": PassageQuality(is_quality=True)}),
     )
     assert rows == []
 
@@ -217,6 +198,70 @@ def test_augment_sample_mode_validates_probabilities(passage):
             selection_mode="sample",
             model=FakeModel({}),
         )
+
+
+def test_augment_sample_mode_prefilter_rejects_low_quality(monkeypatch):
+    monkeypatch.setattr("text_albumentations.easy.random.random", lambda: 0.0)
+    model = FakeModel({"PassageQuality": PassageQuality(is_quality=False)})
+    rows = ta.augment(
+        "asdf qwerty",
+        tasks={"title": 1.0},
+        selection_mode="sample",
+        model=model,
+    )
+    assert rows == []
+    # Only the prefilter call should have been made — no generation calls
+    assert len(model.calls) == 1
+    assert model.calls[0][1] == "PassageQuality"
+
+
+def test_augment_sample_mode_prefilter_allows_quality_passage(monkeypatch, passage):
+    monkeypatch.setattr("text_albumentations.easy.random.random", lambda: 0.0)
+    from text_albumentations.tasks.title import TitleHeadline
+    model = FakeModel(
+        {
+            "PassageQuality": PassageQuality(is_quality=True),
+            "TitleHeadline": TitleHeadline(title="T", headline="H"),
+        }
+    )
+    rows = ta.augment(
+        passage,
+        tasks={"title": 1.0},
+        selection_mode="sample",
+        model=model,
+    )
+    assert [row.output for row in rows] == ["T", "H"]
+
+
+def test_augment_sample_mode_prefilter_false_skips_quality_check(monkeypatch, passage):
+    monkeypatch.setattr("text_albumentations.easy.random.random", lambda: 0.0)
+    from text_albumentations.tasks.title import TitleHeadline
+    model = FakeModel({"TitleHeadline": TitleHeadline(title="T", headline="H")})
+    rows = ta.augment(
+        passage,
+        tasks={"title": 1.0},
+        selection_mode="sample",
+        prefilter=False,
+        model=model,
+    )
+    assert [row.output for row in rows] == ["T", "H"]
+    # No PassageQuality call should have been made
+    assert all(call[1] != "PassageQuality" for call in model.calls)
+
+
+@pytest.mark.anyio
+async def test_aaugment_sample_mode_prefilter_rejects_low_quality(monkeypatch):
+    monkeypatch.setattr("text_albumentations.easy.random.random", lambda: 0.0)
+    model = FakeModel({"PassageQuality": PassageQuality(is_quality=False)})
+    rows = await ta.aaugment(
+        "asdf qwerty",
+        tasks={"title": 1.0},
+        selection_mode="sample",
+        model=model,
+    )
+    assert rows == []
+    assert len(model.calls) == 1
+    assert model.calls[0][1] == "PassageQuality"
 
 
 def test_augment_postfilter_keeps_only_quality_rows(passage):
@@ -257,12 +302,8 @@ async def test_aaugment_explicit_tasks(passage):
 async def test_aselect_tasks(passage):
     model = FakeModel(
         {
-            "MetaSelection": MetaSelection(
-                is_low_quality=False,
-                low_quality_reason="",
-                selected=["title"],
-                reasoning="title fits",
-            ),
+            "PassageQuality": PassageQuality(is_quality=True),
+            "MetaSelection": MetaSelection(selected=["title"]),
         }
     )
     selection = await ta.aselect_tasks(passage, tasks=["title"], model=model)

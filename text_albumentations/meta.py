@@ -10,6 +10,44 @@ from text_albumentations.runtime import ModelRuntime
 from text_albumentations.utils import AlpacaDataset
 
 
+class PassageQuality(BaseModel):
+    is_quality: bool
+
+
+_PREFILTER_SYSTEM_PROMPT = (
+    "You are a text quality filter. "
+    "Return is_quality=true only if the passage contains meaningful natural-language content "
+    "with at least roughly ten words; return false for markup-only, code, random characters, "
+    "headers, or boilerplate."
+)
+
+
+def prefilter_passage(text: str, runtime: ModelRuntime) -> bool:
+    result = runtime.generate_structured(
+        [
+            {"role": "system", "content": _PREFILTER_SYSTEM_PROMPT},
+            {"role": "user", "content": text},
+        ],
+        PassageQuality,
+        temperature=0.1,
+        max_tokens=20,
+    )
+    return result.is_quality
+
+
+async def aprefilter_passage(text: str, runtime: ModelRuntime) -> bool:
+    result = await runtime.agenerate_structured(
+        [
+            {"role": "system", "content": _PREFILTER_SYSTEM_PROMPT},
+            {"role": "user", "content": text},
+        ],
+        PassageQuality,
+        temperature=0.1,
+        max_tokens=20,
+    )
+    return result.is_quality
+
+
 # (name, augmentation) — the selection hint comes from the augmentation's
 # `selection_hint` attribute. A third element overrides it.
 AugmentationEntry = (
@@ -24,21 +62,9 @@ class AugmentationOption(BaseModel):
 
 
 class MetaSelection(BaseModel):
-    is_low_quality: bool = Field(
-        ...,
-        description="True if the passage is too short, nonsensical, or contains no meaningful content",
-    )
-    low_quality_reason: str = Field(
-        ...,
-        description="Explanation of why the passage is low quality, if applicable",
-    )
     selected: list[str] = Field(
         ...,
         description="Names of augmentations that would work well for this passage",
-    )
-    reasoning: str = Field(
-        ...,
-        description="Brief reasoning for why these augmentations were selected",
     )
 
 
@@ -65,19 +91,12 @@ def _describe_option(option: AugmentationOption) -> str:
 def _build_selection_prompt(options: list[AugmentationOption]) -> str:
     aug_descriptions = "\n".join(_describe_option(opt) for opt in options)
     return (
-        "You are a data quality evaluator and augmentation selector.\n\n"
-        "Step 1: Assess whether the passage is low quality. A passage is low quality if it is:\n"
-        "- Too short (fewer than roughly 10 meaningful words)\n"
-        "- Nonsensical or random character sequences\n"
-        "- Only contains formatting, markup, or code with no natural language content\n"
-        "- Contains only metadata, headers, or boilerplate with no substantive content\n\n"
-        "Step 2: If the passage passes the quality check, select which augmentations "
-        "from the list below would be most appropriate. Choose only augmentations "
-        "that are well-suited to the passage's content, structure, and length. "
+        "You are an augmentation selector. Select which augmentations from the list below "
+        "would be most appropriate for the passage. Choose only augmentations that are "
+        "well-suited to the passage's content, structure, and length. "
         "You may select zero, one, or multiple augmentations.\n\n"
         "Available augmentations:\n"
-        f"{aug_descriptions}\n\n"
-        "Return your assessment."
+        f"{aug_descriptions}"
     )
 
 
@@ -89,8 +108,6 @@ class MetaAugmentation(BaseSingleChunkAugmentation[MetaSelection]):
     def __init__(
         self,
         augmentations: list[AugmentationEntry],
-        *,
-        prefilter: bool = True,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -113,7 +130,6 @@ class MetaAugmentation(BaseSingleChunkAugmentation[MetaSelection]):
         # Constrain `selected` to the actual augmentation names so the
         # selector cannot hallucinate a task that does not exist.
         self.schema = _build_selection_schema(tuple(self._aug_map))
-        self.prefilter = prefilter
 
     def build_messages(
         self,
@@ -132,10 +148,6 @@ class MetaAugmentation(BaseSingleChunkAugmentation[MetaSelection]):
     ) -> list[AlpacaDataset]:
         validated = self.validate_passages(passages)
         selection = self.generate_one(validated, runtime)
-
-        if self.prefilter and selection.is_low_quality:
-            return []
-
         dataset: list[AlpacaDataset] = []
         for name in selection.selected:
             aug = self._aug_map.get(name)
@@ -150,10 +162,6 @@ class MetaAugmentation(BaseSingleChunkAugmentation[MetaSelection]):
     ) -> list[AlpacaDataset]:
         validated = self.validate_passages(passages)
         selection = await self.agenerate_one(validated, runtime)
-
-        if self.prefilter and selection.is_low_quality:
-            return []
-
         dataset: list[AlpacaDataset] = []
         for name in selection.selected:
             aug = self._aug_map.get(name)
@@ -170,10 +178,9 @@ def apply_best_augmentations(
     prefilter: bool = True,
     add_reasoning: bool = False,
 ) -> list[AlpacaDataset]:
-    meta = MetaAugmentation(
-        augmentations,
-        prefilter=prefilter,
-    )
+    if prefilter and not prefilter_passage(passage, runtime):
+        return []
+    meta = MetaAugmentation(augmentations)
     dataset = run_augmentation(passage, meta, runtime)
     if add_reasoning:
         from text_albumentations.reasoning import add_reasoning_to_dataset
@@ -189,10 +196,9 @@ async def aapply_best_augmentations(
     prefilter: bool = True,
     add_reasoning: bool = False,
 ) -> list[AlpacaDataset]:
-    meta = MetaAugmentation(
-        augmentations,
-        prefilter=prefilter,
-    )
+    if prefilter and not await aprefilter_passage(passage, runtime):
+        return []
+    meta = MetaAugmentation(augmentations)
     dataset = await arun_augmentation(passage, meta, runtime)
     if add_reasoning:
         from text_albumentations.reasoning import aadd_reasoning_to_dataset
