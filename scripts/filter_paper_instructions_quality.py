@@ -45,6 +45,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prompt-file", type=Path, default=None)
     parser.add_argument("--splits", nargs="+", default=["train", "test"])
     parser.add_argument(
+        "--dataset-loading",
+        choices=["disk", "memory", "streaming"],
+        default="disk",
+        help=(
+            "How to read source splits. 'disk' downloads/caches locally and "
+            "iterates Arrow-backed rows, 'memory' keeps the split in RAM, and "
+            "'streaming' reads from Hugging Face during processing."
+        ),
+    )
+    parser.add_argument(
         "--response-format",
         choices=["json_object", "json_schema", "none"],
         default="json_object",
@@ -77,6 +87,71 @@ def write_jsonl(path: Path, row: dict[str, Any]) -> None:
     with path.open("a") as file:
         file.write(json.dumps(row, ensure_ascii=False) + "\n")
         file.flush()
+
+
+def write_jsonl_handle(file: Any, row: dict[str, Any]) -> None:
+    file.write(json.dumps(row, ensure_ascii=False) + "\n")
+    file.flush()
+
+
+def is_retryable_decision(decision: dict[str, Any]) -> bool:
+    return bool(decision.get("judge_error"))
+
+
+def rewrite_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with tmp_path.open("w") as file:
+        for row in rows:
+            file.write(json.dumps(row, ensure_ascii=False) + "\n")
+    tmp_path.replace(path)
+
+
+def load_completed_decisions(
+    *,
+    kept_path: Path,
+    rejected_path: Path,
+    decisions_path: Path,
+) -> set[int]:
+    if not decisions_path.exists():
+        return set()
+
+    completed_by_index: dict[int, dict[str, Any]] = {}
+    retryable_count = 0
+    with decisions_path.open() as file:
+        for line in file:
+            decision = json.loads(line)
+            row_index = decision["row_index"]
+            if is_retryable_decision(decision):
+                retryable_count += 1
+                continue
+            completed_by_index[row_index] = decision
+
+    completed_decisions = [
+        completed_by_index[row_index]
+        for row_index in sorted(completed_by_index)
+    ]
+    rewrite_jsonl(decisions_path, completed_decisions)
+    rewrite_jsonl(
+        kept_path,
+        [
+            decision["row"]
+            for decision in completed_decisions
+            if decision["is_quality"]
+        ],
+    )
+    rewrite_jsonl(
+        rejected_path,
+        [
+            decision
+            for decision in completed_decisions
+            if not decision["is_quality"]
+        ],
+    )
+    print(
+        f"compacted {decisions_path.name}: kept {len(completed_decisions)} "
+        f"completed decisions, removed {retryable_count} retryable errors"
+    )
+    return set(completed_by_index)
 
 
 def extract_json_object(text: str) -> dict[str, Any]:
@@ -204,17 +279,35 @@ async def filter_split(
     require_parameters: bool,
     concurrency: int,
     max_rows: int | None,
+    dataset_loading: str,
 ) -> None:
     kept_path = output_dir / f"{split}.jsonl"
     rejected_path = output_dir / f"{split}.rejected.jsonl"
     decisions_path = output_dir / f"{split}.decisions.jsonl"
 
-    processed = count_jsonl(decisions_path)
-    print(f"[{split}] resuming after {processed} processed rows")
+    completed_indexes = load_completed_decisions(
+        kept_path=kept_path,
+        rejected_path=rejected_path,
+        decisions_path=decisions_path,
+    )
+    print(f"[{split}] resuming with {len(completed_indexes)} completed rows")
+    if max_rows == 0:
+        print(
+            f"[{split}] done kept={count_jsonl(kept_path)} "
+            f"rejected={count_jsonl(rejected_path)} decisions={count_jsonl(decisions_path)}"
+        )
+        return
 
-    dataset = load_dataset(dataset_name, split=split, streaming=True)
+    if dataset_loading == "streaming":
+        dataset = load_dataset(dataset_name, split=split, streaming=True)
+    elif dataset_loading == "memory":
+        dataset = load_dataset(dataset_name, split=split, keep_in_memory=True)
+    else:
+        dataset = load_dataset(dataset_name, split=split)
+
     semaphore = asyncio.Semaphore(concurrency)
     pending: set[asyncio.Task[dict[str, Any]]] = set()
+    scheduled_count = 0
 
     async def schedule(row_index: int, row: dict[str, Any]) -> None:
         async with semaphore:
@@ -228,7 +321,12 @@ async def filter_split(
                 require_parameters=require_parameters,
             )
 
-    async def drain_one() -> None:
+    async def drain_one(
+        *,
+        kept_file: Any,
+        rejected_file: Any,
+        decisions_file: Any,
+    ) -> None:
         done, pending_remaining = await asyncio.wait(
             pending,
             return_when=asyncio.FIRST_COMPLETED,
@@ -237,29 +335,43 @@ async def filter_split(
         pending.update(pending_remaining)
         for task in done:
             decision = task.result()
-            write_jsonl(decisions_path, decision)
+            write_jsonl_handle(decisions_file, decision)
             if decision["is_quality"]:
-                write_jsonl(kept_path, decision["row"])
+                write_jsonl_handle(kept_file, decision["row"])
             else:
-                write_jsonl(rejected_path, decision)
+                write_jsonl_handle(rejected_file, decision)
             if decision["row_index"] % 100 == 0:
                 print(
                     f"[{split}] processed row_index={decision['row_index']} "
                     f"quality={decision['is_quality']}"
                 )
 
-    for row_index, row in enumerate(dataset):
-        if row_index < processed:
-            continue
-        if max_rows is not None and row_index >= processed + max_rows:
-            break
+    with (
+        kept_path.open("a") as kept_file,
+        rejected_path.open("a") as rejected_file,
+        decisions_path.open("a") as decisions_file,
+    ):
+        for row_index, row in enumerate(dataset):
+            if row_index in completed_indexes:
+                continue
+            if max_rows is not None and scheduled_count >= max_rows:
+                break
 
-        pending.add(asyncio.create_task(schedule(row_index, dict(row))))
-        if len(pending) >= concurrency:
-            await drain_one()
+            pending.add(asyncio.create_task(schedule(row_index, dict(row))))
+            scheduled_count += 1
+            if len(pending) >= concurrency:
+                await drain_one(
+                    kept_file=kept_file,
+                    rejected_file=rejected_file,
+                    decisions_file=decisions_file,
+                )
 
-    while pending:
-        await drain_one()
+        while pending:
+            await drain_one(
+                kept_file=kept_file,
+                rejected_file=rejected_file,
+                decisions_file=decisions_file,
+            )
 
     print(
         f"[{split}] done kept={count_jsonl(kept_path)} "
@@ -281,6 +393,7 @@ async def main() -> None:
         "model": args.model,
         "base_url": args.base_url,
         "splits": args.splits,
+        "dataset_loading": args.dataset_loading,
         "response_format": args.response_format,
         "require_parameters": not args.no_require_parameters,
         "prompt": prompt,
@@ -301,6 +414,7 @@ async def main() -> None:
             require_parameters=not args.no_require_parameters,
             concurrency=args.concurrency,
             max_rows=args.max_rows_per_split,
+            dataset_loading=args.dataset_loading,
         )
 
 

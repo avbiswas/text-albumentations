@@ -59,6 +59,33 @@ def test_openai_model_unknown_auto_uses_json_object():
     model = ta.OpenAIModel("m", base_url="http://localhost:8080/v1", api_key="k")
     assert model.response_format_mode == "json_object"
     assert model.response_format == {"type": "json_object"}
+    assert model.generation_kwargs["reasoning_effort"] == "low"
+
+
+def test_openai_model_reasoning_effort_can_be_disabled():
+    model = ta.OpenAIModel(
+        "m",
+        base_url="http://localhost:8080/v1",
+        api_key="k",
+        reasoning_effort=None,
+    )
+    assert "reasoning_effort" not in model.generation_kwargs
+
+
+def test_openai_model_completion_kwargs_override_defaults():
+    model = ta.OpenAIModel(
+        "m",
+        base_url="http://localhost:8080/v1",
+        api_key="k",
+        completion_kwargs={
+            "reasoning_effort": "high",
+            "extra_body": {"reasoning": {"effort": "medium"}},
+        },
+    )
+    assert model.generation_kwargs["reasoning_effort"] == "high"
+    assert model.generation_kwargs["extra_body"] == {
+        "reasoning": {"effort": "medium"}
+    }
 
 
 def test_openai_model_custom_response_format():
@@ -125,6 +152,16 @@ def test_openai_model_invalid_response_format_raises():
             base_url="http://localhost:8080/v1",
             api_key="k",
             response_format="bad",  # type: ignore[arg-type]
+        )
+
+
+def test_openai_model_invalid_reasoning_effort_raises():
+    with pytest.raises(ValueError, match="reasoning_effort must be one of"):
+        ta.OpenAIModel(
+            "m",
+            base_url="http://localhost:8080/v1",
+            api_key="k",
+            reasoning_effort="bad",  # type: ignore[arg-type]
         )
 
 

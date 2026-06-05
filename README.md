@@ -205,6 +205,25 @@ model = ta.OpenAIModel(..., response_format="json_schema")
 model = ta.OpenAIModel(..., response_format="json_object")
 ```
 
+`OpenAIModel` also passes `reasoning_effort="low"` by default for
+OpenAI-compatible reasoning models. OpenAI Chat Completions accepts this as a
+top-level parameter; OpenRouter also accepts it, and additionally supports a
+provider-neutral `reasoning` object through `extra_body`.
+
+```python
+model = ta.OpenAIModel(..., reasoning_effort="low")      # default
+model = ta.OpenAIModel(..., reasoning_effort="high")
+model = ta.OpenAIModel(..., reasoning_effort=None)       # disable for local servers
+
+model = ta.OpenAIModel(
+    ...,
+    completion_kwargs={"extra_body": {"reasoning": {"effort": "low"}}},
+)
+```
+
+Use `completion_kwargs` for any other OpenAI/OpenRouter chat-completion
+argument. Values in `completion_kwargs` override the library defaults.
+
 **In-process local models:**
 ```python
 model = ta.LocalMLXModel("mlx-community/Qwen3.5-4B-OptiQ-4bit")   # Apple Silicon

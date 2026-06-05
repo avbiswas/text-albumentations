@@ -32,6 +32,8 @@ class _JsonModeOpenAITypeAdapter:
 
 
 ResponseFormatMode = Literal["auto", "json_schema", "json_object"]
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
+REASONING_EFFORT_VALUES = ("none", "minimal", "low", "medium", "high", "xhigh")
 
 
 MODEL_RESPONSE_FORMAT_CATALOG: tuple[tuple[str, ResponseFormatMode], ...] = (
@@ -94,6 +96,8 @@ class OpenAIModel(OutlinesModel):
         async_mode: bool = False,
         total_concurrent_calls: int = DEFAULT_OPENAI_CONCURRENCY,
         response_format: ResponseFormatMode = "auto",
+        reasoning_effort: ReasoningEffort | None = "low",
+        completion_kwargs: dict[str, object] | None = None,
     ) -> None:
         import openai
         import outlines
@@ -118,6 +122,11 @@ class OpenAIModel(OutlinesModel):
                 + ". Example: OpenAIModel('gpt-5-mini', "
                 "base_url='https://api.openai.com/v1', api_key='sk-...')."
             )
+        if reasoning_effort is not None and reasoning_effort not in REASONING_EFFORT_VALUES:
+            raise ValueError(
+                "reasoning_effort must be one of: "
+                "'none', 'minimal', 'low', 'medium', 'high', 'xhigh', or None."
+            )
 
         client = (
             openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
@@ -133,11 +142,18 @@ class OpenAIModel(OutlinesModel):
                 self.response_format,
             )
 
+        generation_kwargs = {}
+        if reasoning_effort is not None:
+            generation_kwargs["reasoning_effort"] = reasoning_effort
+        if completion_kwargs:
+            generation_kwargs.update(completion_kwargs)
+
         super().__init__(
             outlines_model,
             async_mode=async_mode,
             total_concurrent_calls=total_concurrent_calls,
             max_tokens_parameter="max_completion_tokens",
+            generation_kwargs=generation_kwargs,
         )
         self.model_name = model
 
