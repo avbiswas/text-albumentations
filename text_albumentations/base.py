@@ -32,6 +32,7 @@ class BaseAugmentation(ABC, Generic[PassageT, OutputT]):
     num_generations: int = 1
     variations: int = 0
     variation_context: str | None = None
+    instruction_templates: dict[str, Sequence[str]] = {}
 
     def __init__(
         self,

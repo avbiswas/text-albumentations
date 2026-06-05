@@ -44,8 +44,29 @@ def test_public_task_resolvers():
 
 
 def test_augment_explicit_tasks(passage):
+    # Deterministic legacy instruction text remains available by opting out.
     model = FakeModel({"TitleHeadline": TitleHeadline(title="T", headline="H")})
-    rows = ta.augment(passage, tasks=["title"], model=model)
+    rows = ta.augment(
+        passage,
+        tasks=["title"],
+        model=model,
+        sample_instruction_template=False,
+    )
+    assert [row.output for row in rows] == ["T", "H"]
+
+
+def test_augment_samples_instruction_templates_by_default(monkeypatch, passage):
+    monkeypatch.setattr("text_albumentations.runner.random.choice", lambda seq: seq[-1])
+    model = FakeModel({"TitleHeadline": TitleHeadline(title="T", headline="H")})
+
+    rows = ta.augment(
+        passage,
+        tasks=["title"],
+        model=model,
+    )
+
+    assert rows[0].instruction == "Title this passage in a few words."
+    assert rows[1].instruction == "Generate a short headline based on the passage."
     assert [row.output for row in rows] == ["T", "H"]
 
 
@@ -251,7 +272,13 @@ async def test_aselect_tasks(passage):
 def test_augment_save_to_writes_jsonl(passage, tmp_path):
     model = FakeModel({"TitleHeadline": TitleHeadline(title="T", headline="H")})
     out_file = tmp_path / "rows.jsonl"
-    ta.augment(passage, tasks=["title"], model=model, save_to=str(out_file))
+    ta.augment(
+        passage,
+        tasks=["title"],
+        model=model,
+        save_to=str(out_file),
+        sample_instruction_template=False,
+    )
 
     lines = out_file.read_text().strip().splitlines()
     assert len(lines) == 2

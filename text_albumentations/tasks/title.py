@@ -42,6 +42,26 @@ class TitleAugmentation(BaseSingleChunkAugmentation[TitleHeadline]):
     selection_hint = "the passage has one coherent main subject to name."
     adapters = (TitleAdapter(),)
     temperature = 0.4
+    instruction_templates = {
+        TITLE_INSTRUCTION: (
+            TITLE_INSTRUCTION,
+            "Give this passage a short descriptive title.",
+            "Create a concise title for this passage.",
+            "Write a brief title that names this passage.",
+            "Provide a short title for the passage.",
+            "Generate a compact descriptive title for this passage.",
+            "Title this passage in a few words.",
+        ),
+        HEADLINE_INSTRUCTION: (
+            HEADLINE_INSTRUCTION,
+            "Write a one-sentence headline for the main idea of this passage.",
+            "Summarize the main point of this passage as a headline.",
+            "Create a concise headline capturing the passage's main point.",
+            "Write a headline that reflects the central idea of this passage.",
+            "Provide a one-sentence headline for this passage.",
+            "Generate a short headline based on the passage.",
+        ),
+    }
 
 
 title_augmentation = TitleAugmentation()

@@ -69,6 +69,47 @@ class ContinuationAugmentation(BaseSingleChunkAugmentation[ContinuationSlices]):
     system_prompt = "Generate continuation supervision slices from the provided passage."
     selection_hint = "the passage is at least a few sentences long, so prefix/suffix slices are meaningful."
     adapters = (ContinuationAdapter(),)
+    instruction_templates = {
+        (
+            "You are given the beginning of a passage. "
+            "Continue the passage by generating all remaining text after the provided beginning. "
+            "Do not repeat the provided beginning."
+        ): (
+            "You are given the beginning of a passage. Continue the passage by generating all remaining text after the provided beginning. Do not repeat the provided beginning.",
+            "Continue the passage from the provided beginning without repeating the given text.",
+            "Write the remaining passage after the supplied opening text.",
+            "Generate the text that follows this passage beginning without restating it.",
+            "Complete the passage after the given opening segment.",
+            "Continue from the supplied passage prefix and omit the prefix itself.",
+            "Write only the remaining text after this beginning of the passage.",
+        ),
+        (
+            "You are given the first 20% of a passage. "
+            "Generate the rest of the passage exactly after the provided text. "
+            "Do not repeat the provided text."
+        ): (
+            "You are given the first 20% of a passage. Generate the rest of the passage exactly after the provided text. Do not repeat the provided text.",
+            "Complete the passage after the provided opening segment without repeating it.",
+            "Generate the remaining text that follows this passage prefix.",
+            "Continue the passage from its first section and do not copy the provided text.",
+            "Write the rest of the passage after the supplied first section.",
+            "Produce only the continuation after this passage prefix.",
+            "Complete the passage beginning with the text that comes next.",
+        ),
+        (
+            "You are given the beginning and the ending of a passage. "
+            "Generate only the missing middle section that connects them. "
+            "Do not repeat the provided beginning or ending."
+        ): (
+            "You are given the beginning and the ending of a passage. Generate only the missing middle section that connects them. Do not repeat the provided beginning or ending.",
+            "Fill in only the missing middle section between the provided beginning and ending.",
+            "Write the middle text that connects the given start and end of the passage.",
+            "Generate just the missing middle between this passage's start and end.",
+            "Complete the omitted middle section without repeating the provided edges.",
+            "Write the passage segment that belongs between the given beginning and ending.",
+            "Fill the gap between the provided opening and closing text.",
+        ),
+    }
 
     def generate_one(
         self,

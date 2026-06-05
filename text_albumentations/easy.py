@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import random
 from dataclasses import dataclass
+from collections.abc import Sequence
 from typing import Callable, Literal
 
 from pydantic import BaseModel
@@ -144,6 +145,7 @@ def task(
     schema: type[BaseModel],
     output: str | Callable | None = None,
     instruction: str | None = None,
+    instruction_variants: Sequence[str] | None = None,
     rows: Callable[[str, BaseModel], list[AlpacaDataset]] | None = None,
     selection_hint: str | None = None,
     **augmentation_kwargs,
@@ -196,6 +198,12 @@ def task(
     _FunctionTask.__name__ = f"{schema.__name__}Task"
     if selection_hint is not None:
         _FunctionTask.selection_hint = selection_hint
+    if instruction_variants is not None:
+        if rows is not None:
+            raise ValueError("instruction_variants are only supported with instruction/output rows.")
+        _FunctionTask.instruction_templates = {
+            row_instruction: tuple(dict.fromkeys([row_instruction, *instruction_variants]))
+        }
     return _FunctionTask(**augmentation_kwargs)
 
 
@@ -350,6 +358,7 @@ def augment(
     add_reasoning: bool = False,
     prefilter: bool = True,
     postfilter: bool | str = False,
+    sample_instruction_template: bool = True,
     save_to: str | None = None,
 ) -> list[AlpacaDataset]:
     """Generate training rows from a passage with one call.
@@ -380,19 +389,40 @@ def augment(
         )
         dataset = []
         for augmentation in resolve_tasks(selection.selected_tasks):
-            dataset.extend(run_augmentation(text, augmentation, model))
+            dataset.extend(
+                run_augmentation(
+                    text,
+                    augmentation,
+                    model,
+                    sample_instruction_template=sample_instruction_template,
+                )
+            )
     elif mode == "explicit":
         if tasks is None or isinstance(tasks, dict):
             raise TypeError("selection_mode='explicit' requires a task list.")
         dataset = []
         for augmentation in resolve_tasks(list(tasks)):
-            dataset.extend(run_augmentation(text, augmentation, model))
+            dataset.extend(
+                run_augmentation(
+                    text,
+                    augmentation,
+                    model,
+                    sample_instruction_template=sample_instruction_template,
+                )
+            )
     elif mode == "sample":
         if not isinstance(tasks, dict):
             raise TypeError("selection_mode='sample' requires a probability map.")
         dataset = []
         for augmentation in resolve_tasks(_sample_task_names(tasks)):
-            dataset.extend(run_augmentation(text, augmentation, model))
+            dataset.extend(
+                run_augmentation(
+                    text,
+                    augmentation,
+                    model,
+                    sample_instruction_template=sample_instruction_template,
+                )
+            )
     else:
         raise ValueError("selection_mode must be one of: auto, explicit, sample.")
 
@@ -414,6 +444,7 @@ async def aaugment(
     add_reasoning: bool = False,
     prefilter: bool = True,
     postfilter: bool | str = False,
+    sample_instruction_template: bool = True,
     save_to: str | None = None,
 ) -> list[AlpacaDataset]:
     if model is None:
@@ -444,7 +475,15 @@ async def aaugment(
         raise ValueError("selection_mode must be one of: auto, explicit, sample.")
 
     datasets = await asyncio.gather(
-        *[arun_augmentation(text, augmentation, model) for augmentation in augmentations]
+        *[
+            arun_augmentation(
+                text,
+                augmentation,
+                model,
+                sample_instruction_template=sample_instruction_template,
+            )
+            for augmentation in augmentations
+        ]
     )
     dataset = [row for rows in datasets for row in rows]
     dataset = await _afilter_rows(dataset, postfilter_prompt, model)

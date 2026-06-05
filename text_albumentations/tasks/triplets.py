@@ -98,6 +98,44 @@ class TripletAugmentation(BaseSingleChunkAugmentation[TripletList]):
         ),
     )
     temperature = 0.2
+    instruction_templates = {
+        "Extract knowledge graph triplets from this passage in markdown format.": (
+            "Extract knowledge graph triplets from this passage in markdown format.",
+            "List the passage's supported subject-relation-object triplets in markdown.",
+            "Write markdown bullets for the knowledge graph triplets in this passage.",
+            "Return the passage's knowledge graph triplets as markdown bullets.",
+            "Use markdown format to extract subject-relation-object triplets from this passage.",
+            "Create a markdown list of knowledge graph triplets supported by this passage.",
+            "Output supported relation triplets from this passage in markdown format.",
+        ),
+        "List the subject-relation-object triplets from this passage as markdown bullet points.": (
+            "List the subject-relation-object triplets from this passage as markdown bullet points.",
+            "Extract subject-relation-object facts from this passage as markdown bullets.",
+            "Return markdown bullet points for the passage's relation triplets.",
+            "Write markdown bullet points for the passage's subject-relation-object triplets.",
+            "Use markdown bullets to list the relation triplets in this passage.",
+            "Create markdown bullets containing supported triplets from this passage.",
+            "List supported knowledge graph triplets from this passage in markdown bullets.",
+        ),
+        "Extract knowledge graph triplets from this passage and return them as JSON.": (
+            "Extract knowledge graph triplets from this passage and return them as JSON.",
+            "Return the supported knowledge graph triplets from this passage as JSON.",
+            "Produce a JSON list of subject-relation-object triplets from this passage.",
+            "Output knowledge graph triplets from this passage in JSON format.",
+            "Create JSON objects for the subject-relation-object triplets in this passage.",
+            "Use JSON to return the supported relation triplets from this passage.",
+            "Generate a JSON array of knowledge graph triplets grounded in this passage.",
+        ),
+        "Return a JSON array of subject-relation-object triplets supported by this passage.": (
+            "Return a JSON array of subject-relation-object triplets supported by this passage.",
+            "List the passage's supported relation triplets as a JSON array.",
+            "Output subject-relation-object triplets from this passage in JSON.",
+            "Represent the passage's supported triplets as a JSON array.",
+            "Use a JSON array for the subject-relation-object triplets in this passage.",
+            "Create a JSON array containing only triplets supported by this passage.",
+            "Return supported knowledge graph triplets from this passage in JSON array format.",
+        ),
+    }
 
     def __init__(
         self,

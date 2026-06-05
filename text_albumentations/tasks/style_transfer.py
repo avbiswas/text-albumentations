@@ -64,6 +64,19 @@ class StyleTransferAugmentation(BaseSingleChunkAugmentation[StyleRewrite]):
         self.style = style
         self.style_description = style_description
         self.system_prompt = build_system_prompt(style_description)
+        instruction = f"Rewrite this passage in {style_description}."
+        self.instruction_templates = {
+            instruction: (
+                instruction,
+                f"Recast this passage in {style_description}.",
+                f"Rewrite the passage using {style_description}.",
+                f"Express this passage in {style_description}.",
+                f"Transform the passage into {style_description}.",
+                f"Restyle this passage using {style_description}.",
+                f"Write this passage again in {style_description}.",
+                f"Convert the passage to {style_description}.",
+            ),
+        }
         kwargs.setdefault("adapters", (StyleTransferAdapter(style_description),))
         super().__init__(**kwargs)
         self.max_rewritten_length = max_rewritten_length

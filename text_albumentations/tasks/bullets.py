@@ -83,6 +83,44 @@ class BulletAugmentation(BaseSingleChunkAugmentation[BulletList]):
     )
     temperature = 0.2
     variations = 1
+    instruction_templates = {
+        "Extract the important points from this passage as markdown bullet points.": (
+            "Extract the important points from this passage as markdown bullet points.",
+            "List the key points from this passage as markdown bullets.",
+            "Pull out the main points from this passage as markdown bullet points.",
+            "Return the passage's important points as markdown bullets.",
+            "Write markdown bullet points for the key ideas in this passage.",
+            "Use markdown bullets to extract the important points from this passage.",
+            "Create a markdown bullet list of this passage's main points.",
+        ),
+        "Summarize this passage as markdown bullet points.": (
+            "Summarize this passage as markdown bullet points.",
+            "Write a markdown bullet-point summary of this passage.",
+            "Condense this passage into markdown bullet points.",
+            "Summarize the passage using markdown bullets.",
+            "Create a markdown bullet summary of the passage.",
+            "Return a concise markdown bullet list summarizing this passage.",
+            "Write the key summary points as markdown bullets.",
+        ),
+        "Extract the important points from this passage as a Python list of strings.": (
+            "Extract the important points from this passage as a Python list of strings.",
+            "Return the key points from this passage as a Python list of strings.",
+            "List the main points from this passage as a Python list of strings.",
+            "Output the passage's important points as a Python list of strings.",
+            "Create a Python list of strings containing the key points from this passage.",
+            "Represent the important points as a Python list of strings.",
+            "Use a Python list of strings for the passage's main points.",
+        ),
+        "Return a Python list of the key points from this passage.": (
+            "Return a Python list of the key points from this passage.",
+            "Provide the passage's key points as a Python list.",
+            "Output a Python list containing the main points of this passage.",
+            "Write the passage's key points as a Python list of strings.",
+            "Create a Python list with the important points from this passage.",
+            "Return the main ideas from this passage in Python list format.",
+            "Use Python list syntax to list the passage's key points.",
+        ),
+    }
 
     def __init__(
         self,

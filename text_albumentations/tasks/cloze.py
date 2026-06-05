@@ -65,6 +65,32 @@ class ClozeAugmentation(BaseSingleChunkAugmentation[ClozeSlices]):
     system_prompt = "Generate cloze supervision slices from the provided passage."
     selection_hint = "the passage has multiple sentences with distinctive content words to mask."
     adapters = (ClozeAdapter(),)
+    instruction_templates = {
+        (
+            "Fill in the blanks in this passage. Each blank is marked as [BLANK n]. "
+            "Answer with the missing words in order, one per line, as '[BLANK n]: word'."
+        ): (
+            "Fill in the blanks in this passage. Each blank is marked as [BLANK n]. Answer with the missing words in order, one per line, as '[BLANK n]: word'.",
+            "Replace each [BLANK n] with the missing word and answer one per line as '[BLANK n]: word'.",
+            "Identify the missing words for each [BLANK n] and list them in '[BLANK n]: word' format.",
+            "Complete the blanks and return the answers one per line using '[BLANK n]: word'.",
+            "Find the missing word for every [BLANK n] and keep the '[BLANK n]: word' answer format.",
+            "Answer each numbered blank with its missing word using the format '[BLANK n]: word'.",
+            "Fill each [BLANK n] and provide the missing words in order, one per line.",
+        ),
+        (
+            "One sentence in this passage has been replaced with [MISSING SENTENCE]. "
+            "Write the missing sentence so it fits the surrounding context."
+        ): (
+            "One sentence in this passage has been replaced with [MISSING SENTENCE]. Write the missing sentence so it fits the surrounding context.",
+            "Write the sentence that should replace [MISSING SENTENCE] in this passage.",
+            "Fill in [MISSING SENTENCE] with the sentence that fits the surrounding passage.",
+            "Recover the missing sentence from the passage context.",
+            "Provide the sentence that belongs where [MISSING SENTENCE] appears.",
+            "Use the context to write the omitted sentence.",
+            "Complete the passage by supplying only the missing sentence.",
+        ),
+    }
 
     def generate_one(
         self,

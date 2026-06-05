@@ -51,6 +51,55 @@ def test_callable_output_and_custom_instruction(passage):
     assert rows[0].instruction == "Find the key number."
 
 
+def test_custom_task_instruction_variants(monkeypatch, passage):
+    monkeypatch.setattr("text_albumentations.runner.random.choice", lambda seq: seq[-1])
+    key_stat = ta.task(
+        prompt="Extract the most important statistic.",
+        schema=KeyStat,
+        output="{statistic}",
+        instruction="Find the key number.",
+        instruction_variants=[
+            "Identify the most important number in this passage.",
+            "Extract the key statistic from this passage.",
+        ],
+    )
+
+    rows = ta.augment(
+        passage,
+        tasks=[key_stat],
+        model=FAKE,
+        sample_instruction_template=True,
+    )
+
+    assert rows[0].instruction == "Extract the key statistic from this passage."
+    assert rows[0].output == "28.4 BLEU"
+
+
+def test_custom_task_batch_samples_instruction_variants_by_default(monkeypatch, passage):
+    monkeypatch.setattr("text_albumentations.runner.random.choice", lambda seq: seq[-1])
+    key_stat = ta.task(
+        prompt="Extract the most important statistic.",
+        schema=KeyStat,
+        output="{statistic}",
+        instruction="Find the key number.",
+        instruction_variants=[
+            "Identify the most important number in this passage.",
+            "Extract the key statistic from this passage.",
+        ],
+    )
+
+    rows = ta.run_batch_augmentation(
+        [passage, passage],
+        key_stat,
+        FAKE,
+    )
+
+    assert [row.instruction for row in rows] == [
+        "Extract the key statistic from this passage.",
+        "Extract the key statistic from this passage.",
+    ]
+
+
 def test_single_field_schema_needs_no_output(passage):
     tldr = ta.task(prompt="Write a one-sentence TLDR.", schema=Tldr)
     rows = ta.augment(passage, tasks=[tldr], model=FAKE)
@@ -72,6 +121,16 @@ def test_rows_callable_full_control(passage):
     key_stat = ta.task(prompt="Extract.", schema=KeyStat, rows=to_rows)
     rows = ta.augment(passage, tasks=[key_stat], model=FAKE)
     assert [row.instruction for row in rows] == ["i1", "i2"]
+
+
+def test_instruction_variants_require_standard_task_rows():
+    with pytest.raises(ValueError, match="instruction_variants"):
+        ta.task(
+            prompt="p",
+            schema=KeyStat,
+            rows=lambda p, o: [],
+            instruction_variants=["variant"],
+        )
 
 
 def test_output_and_rows_are_mutually_exclusive():

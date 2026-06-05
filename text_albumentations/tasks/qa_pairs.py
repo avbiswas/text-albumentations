@@ -42,10 +42,6 @@ def format_questions_markdown(qa_pairs: list[QA]) -> str:
     )
 
 
-def format_facts_markdown(qa_pairs: list[QA]) -> str:
-    return "\n".join(f"- {qa_pair.answer}" for qa_pair in qa_pairs)
-
-
 def format_single_qa_markdown(qa_pair: QA) -> str:
     return (
         f"**Question:** {qa_pair.question}\n\n"
@@ -57,7 +53,6 @@ class MarkdownQaAdapter(BaseAlpacaAdapter[str, QAList]):
     def convert(self, passages: str, output: QAList) -> list[AlpacaDataset]:
         qa_pairs_markdown = format_qa_pairs_markdown(output.qa_pairs)
         questions_markdown = format_questions_markdown(output.qa_pairs)
-        facts_markdown = format_facts_markdown(output.qa_pairs)
         dataset = [
             AlpacaDataset(
                 instruction=SYSTEM_PROMPT,
@@ -69,17 +64,18 @@ class MarkdownQaAdapter(BaseAlpacaAdapter[str, QAList]):
                 input=passages,
                 output=questions_markdown,
             ),
-            AlpacaDataset(
-                instruction="List the important questions answered by this passage using markdown.",
-                input=passages,
-                output=questions_markdown,
-            ),
-            AlpacaDataset(
-                instruction="Generate some important facts from this passage in markdown bullet points.",
-                input=passages,
-                output=facts_markdown,
-            ),
         ]
+
+        first_qa_pair = output.qa_pairs[0]
+        dataset.extend(
+            [
+                AlpacaDataset(
+                    instruction="Generate a question from this passage",
+                    input=passages,
+                    output=first_qa_pair.question,
+                ),
+            ]
+        )
 
         for qa_pair in output.qa_pairs:
             dataset.extend(
@@ -88,16 +84,6 @@ class MarkdownQaAdapter(BaseAlpacaAdapter[str, QAList]):
                         instruction="Generate one question and its corresponding answer from this passage in markdown format.",
                         input=passages,
                         output=format_single_qa_markdown(qa_pair),
-                    ),
-                    AlpacaDataset(
-                        instruction="Generate a question from this passage",
-                        input=passages,
-                        output=qa_pair.question,
-                    ),
-                    AlpacaDataset(
-                        instruction="Generate an important fact or piece of information from this passage",
-                        input=passages,
-                        output=qa_pair.answer,
                     ),
                     AlpacaDataset(
                         instruction="Answer the user's question given the provided passage",
@@ -134,23 +120,18 @@ class JsonQaAdapter(BaseAlpacaAdapter[str, QAList]):
                     ensure_ascii=False,
                 ),
             ),
-            AlpacaDataset(
-                instruction="List the important questions answered by this passage. Return a JSON array of strings.",
-                input=passages,
-                output=json.dumps(
-                    [qa_pair.question for qa_pair in output.qa_pairs],
-                    ensure_ascii=False,
-                ),
-            ),
-            AlpacaDataset(
-                instruction="Generate some facts from this passage. Return a JSON array of strings.",
-                input=passages,
-                output=json.dumps(
-                    [qa_pair.answer for qa_pair in output.qa_pairs],
-                    ensure_ascii=False,
-                ),
-            ),
         ]
+
+        first_qa_pair = output.qa_pairs[0]
+        dataset.extend(
+            [
+                AlpacaDataset(
+                    instruction="Generate a question from this passage",
+                    input=passages,
+                    output=first_qa_pair.question,
+                ),
+            ]
+        )
 
         for qa_pair in output.qa_pairs:
             dataset.extend(
@@ -159,16 +140,6 @@ class JsonQaAdapter(BaseAlpacaAdapter[str, QAList]):
                         instruction="Generate one question and it's corresponding answer from this passage. Return answer as a json of question and answer",
                         input=passages,
                         output=qa_pair.model_dump_json(),
-                    ),
-                    AlpacaDataset(
-                        instruction="Generate a question from this passage",
-                        input=passages,
-                        output=qa_pair.question,
-                    ),
-                    AlpacaDataset(
-                        instruction="Generate an important fact or piece of information from this passage",
-                        input=passages,
-                        output=qa_pair.answer,
                     ),
                     AlpacaDataset(
                         instruction="Answer the user's question given the provided passage",
@@ -206,6 +177,65 @@ class QaPairAugmentation(BaseSingleChunkAugmentation[QAList]):
             ),
         ),
     )
+    instruction_templates = {
+        SYSTEM_PROMPT: (
+            SYSTEM_PROMPT,
+            "Generate important question-answer pairs from this passage.",
+            "Create a short list of question-answer pairs grounded in this passage.",
+            "Write question-answer pairs that can be answered from this passage.",
+            "Produce useful QA pairs based only on this passage.",
+            "Turn this passage into important question-answer pairs.",
+            "Extract answerable questions and their answers from this passage.",
+        ),
+        "Generate a set of questions from this passage in markdown format.": (
+            "Generate a set of questions from this passage in markdown format.",
+            "Write markdown-formatted questions that are answered by this passage.",
+            "Create a markdown list of questions based on this passage.",
+            "Return questions from this passage as a markdown numbered list.",
+            "List answerable questions from this passage using markdown.",
+            "Produce markdown questions grounded in this passage.",
+        ),
+        "Generate a question from this passage": (
+            "Generate a question from this passage",
+            "Write one question that can be answered from this passage.",
+            "Create one passage-grounded question.",
+            "Ask one important question based on this passage.",
+            "Produce a single answerable question from this passage.",
+            "Write one useful question about this passage.",
+        ),
+        "Generate one question and its corresponding answer from this passage in markdown format.": (
+            "Generate one question and its corresponding answer from this passage in markdown format.",
+            "Write one passage-grounded question-answer pair in markdown format.",
+            "Create a single QA pair from this passage using markdown.",
+            "Return one question and answer from this passage as markdown.",
+            "Produce one markdown-formatted question-answer pair based on this passage.",
+            "Use markdown format to write one question and answer from this passage.",
+        ),
+        "Answer the user's question given the provided passage": (
+            "Answer the user's question given the provided passage",
+            "Answer the question using only the provided passage.",
+            "Use the passage to answer the user's question.",
+            "Read the passage and answer the question.",
+            "Give the answer supported by the passage.",
+            "Respond to the question based on the passage.",
+        ),
+        "Generate a list of questions from this passage. Return a JSON array of strings.": (
+            "Generate a list of questions from this passage. Return a JSON array of strings.",
+            "Write questions from this passage as a JSON array of strings.",
+            "Return a JSON array of answerable questions based on this passage.",
+            "Create passage-grounded questions and output them as a JSON string array.",
+            "Produce a JSON array of questions that this passage answers.",
+            "List questions from this passage in JSON array format.",
+        ),
+        "Generate one question and it's corresponding answer from this passage. Return answer as a json of question and answer": (
+            "Generate one question and it's corresponding answer from this passage. Return answer as a json of question and answer",
+            "Create one QA pair from this passage and return it as JSON with question and answer fields.",
+            "Return a JSON object containing one question and answer from this passage.",
+            "Write one passage-grounded question-answer pair as JSON.",
+            "Produce one JSON QA object based on this passage.",
+            "Generate one question and answer from this passage in JSON object format.",
+        ),
+    }
 
     def __init__(
         self,

@@ -4,6 +4,7 @@ from text_albumentations.tasks.backtranslation import (
     BacktranslatedInstruction,
     BacktranslationAdapter,
 )
+from text_albumentations.tasks.bullets import bullet_augmentation
 from text_albumentations.tasks.classification import ClassificationAdapter, PassageLabels
 from text_albumentations.tasks.cloze import cloze_augmentation
 from text_albumentations.tasks.counterfactual import Counterfactual, CounterfactualAdapter
@@ -13,9 +14,17 @@ from text_albumentations.tasks.extractive_qa import (
     ExtractiveQaItem,
     quote_in_passage,
 )
+from text_albumentations.tasks.qa_pairs import (
+    JsonQaAdapter,
+    MarkdownQaAdapter,
+    QA,
+    QAList,
+    qa_pair_augmentation,
+)
 from text_albumentations.tasks.style_transfer import StyleTransferAugmentation
 from text_albumentations.tasks.summarize import Summary, SummarizeAdapter, summarize_augmentation
 from text_albumentations.tasks.title import TitleAdapter, TitleHeadline
+from text_albumentations.tasks.triplets import triplet_augmentation
 
 
 class TestCloze:
@@ -65,6 +74,96 @@ class TestExtractiveQa:
     def test_quote_verification_normalizes_whitespace_and_case(self):
         assert quote_in_passage("Hello   WORLD", "hello world, again")
         assert not quote_in_passage("goodbye world", "hello world")
+
+
+class TestQaPairs:
+    def test_markdown_adapter_uses_first_pair_for_single_question(self, passage):
+        output = QAList(
+            qa_pairs=[
+                QA(question="First question?", answer="First answer."),
+                QA(question="Second question?", answer="Second answer."),
+                QA(question="Third question?", answer="Third answer."),
+            ]
+        )
+
+        rows = MarkdownQaAdapter().convert(passage, output)
+
+        assert len(rows) == 12
+        single_question_rows = [
+            row for row in rows if row.instruction == "Generate a question from this passage"
+        ]
+        fact_rows = [
+            row
+            for row in rows
+            if row.instruction
+            == "Generate an important fact or piece of information from this passage"
+        ]
+        list_question_rows = [
+            row
+            for row in rows
+            if row.instruction
+            == "List the important questions answered by this passage using markdown."
+        ]
+        assert [row.output for row in single_question_rows] == ["First question?"]
+        assert fact_rows == []
+        assert list_question_rows == []
+
+    def test_json_adapter_uses_first_pair_for_single_question(self, passage):
+        output = QAList(
+            qa_pairs=[
+                QA(question="First question?", answer="First answer."),
+                QA(question="Second question?", answer="Second answer."),
+                QA(question="Third question?", answer="Third answer."),
+            ]
+        )
+
+        rows = JsonQaAdapter().convert(passage, output)
+
+        assert len(rows) == 12
+        single_question_rows = [
+            row for row in rows if row.instruction == "Generate a question from this passage"
+        ]
+        fact_rows = [
+            row
+            for row in rows
+            if row.instruction
+            == "Generate an important fact or piece of information from this passage"
+        ]
+        list_question_rows = [
+            row
+            for row in rows
+            if row.instruction
+            == "List the important questions answered by this passage. Return a JSON array of strings."
+        ]
+        assert [row.output for row in single_question_rows] == ["First question?"]
+        assert fact_rows == []
+        assert list_question_rows == []
+
+
+class TestInstructionTemplates:
+    def test_format_specific_instruction_templates_keep_format_words(self):
+        for templates in (
+            bullet_augmentation.instruction_templates,
+            qa_pair_augmentation.instruction_templates,
+            triplet_augmentation.instruction_templates,
+        ):
+            for default, variants in templates.items():
+                normalized_default = default.lower()
+                if "markdown" in normalized_default:
+                    assert all("markdown" in variant.lower() for variant in variants)
+                if "json" in normalized_default:
+                    assert all("json" in variant.lower() for variant in variants)
+                if "python list" in normalized_default:
+                    assert all("python list" in variant.lower() for variant in variants)
+
+    def test_default_instruction_is_first_variant(self):
+        for templates in (
+            bullet_augmentation.instruction_templates,
+            qa_pair_augmentation.instruction_templates,
+            triplet_augmentation.instruction_templates,
+        ):
+            for default, variants in templates.items():
+                assert variants[0] == default
 
 
 class TestCounterfactual:

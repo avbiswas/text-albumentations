@@ -55,6 +55,18 @@ class ExtractiveQaAugmentation(BaseSingleChunkAugmentation[ExtractiveQa]):
     selection_hint = "specific facts in the passage can be quoted verbatim as answers."
     adapters = (ExtractiveQaAdapter(),)
     temperature = 0.3
+    instruction_templates = {
+        INSTRUCTION: (
+            INSTRUCTION,
+            "Use an exact quote from the passage to answer this question.",
+            "Answer by copying the supporting sentence or phrase from the passage.",
+            "Quote the exact passage text that answers the question.",
+            "Answer with the exact sentence or phrase from the passage.",
+            "Find the supporting quote in the passage and use it as the answer.",
+            "Respond by quoting only the passage text that supports the answer.",
+            "Copy the exact evidence from the passage that answers the question.",
+        ),
+    }
 
 
 extractive_qa_augmentation = ExtractiveQaAugmentation()

@@ -33,6 +33,18 @@ class RephraseAugmentation(BaseSingleChunkAugmentation[Rewritten]):
     selection_hint = "the passage is prose that can be restated or elaborated without losing meaning."
     adapters = (RephraseAdapter(),)
     temperature = 0.5
+    instruction_templates = {
+        SYSTEM_PROMPT: (
+            SYSTEM_PROMPT,
+            "Rephrase this passage without changing its meaning.",
+            "Rewrite this passage more clearly while preserving its content.",
+            "Restate this passage in different words without adding new information.",
+            "Rewrite the passage while keeping the same meaning.",
+            "Paraphrase this passage faithfully.",
+            "Express this passage in a clearer way without changing the facts.",
+            "Reword the passage while preserving its original content.",
+        ),
+    }
 
     def __init__(
         self,

@@ -92,6 +92,35 @@ class ClassificationAugmentation(BaseSingleChunkAugmentation[PassageLabels]):
     adapters = (ClassificationAdapter(),)
     temperature = 0.1
     max_tokens = 1024
+    instruction_templates = {
+        TOPIC_INSTRUCTION: (
+            TOPIC_INSTRUCTION,
+            "Name the main topic of this passage in a few words.",
+            "Give a short topic label for this passage.",
+            "Identify this passage's primary topic.",
+            "Write a concise topic label for the passage.",
+            "State the main subject of this passage briefly.",
+            "Classify the passage by its main topic.",
+        ),
+        TONE_INSTRUCTION: (
+            TONE_INSTRUCTION,
+            "Choose the tone category that best fits this passage.",
+            "Label this passage's tone using the provided tone categories.",
+            "Identify the tone category of this passage.",
+            "Classify the passage's tone using the allowed labels.",
+            "Select the best tone label for this passage.",
+            "Determine which tone category describes this passage.",
+        ),
+        AUDIENCE_INSTRUCTION: (
+            AUDIENCE_INSTRUCTION,
+            "Identify the most likely audience for this passage.",
+            "Choose the intended audience category for this passage.",
+            "Classify the likely audience for this passage.",
+            "Name the audience category this passage appears written for.",
+            "Select the intended audience label for this passage.",
+            "Determine who this passage is most likely written for.",
+        ),
+    }
 
 
 classification_augmentation = ClassificationAugmentation()

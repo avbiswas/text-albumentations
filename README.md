@@ -58,6 +58,12 @@ Model primitives:
 - `ta.LocalMLXModel("mlx-community/...")` — an MLX model loaded in-process (Apple Silicon).
 - `ta.LocalHFModel("Qwen/Qwen3.5-2B")` — a Hugging Face Transformers model loaded in-process.
 
+By default, the final Alpaca `instruction` strings are sampled from curated
+per-task template pools. This adds wording variety across rows without changing
+the internal generation prompts, `input`, `output`, or row count. Pass
+`sample_instruction_template=False` when you need the exact default instruction
+strings.
+
 `ta.list_tasks()` returns every built-in single-passage task name with a one-line hint of when it fits. `ta.get_task(...)` and `ta.resolve_tasks(...)` return the augmentation objects when downstream builders want to own scheduling. When you need more control, `tasks=` also accepts configured augmentation instances in explicit mode (e.g. `BulletAugmentation(max_bullets=4)`) — everything below stays available.
 
 Defining your own task takes a schema and a prompt:
@@ -73,12 +79,16 @@ key_stat = ta.task(
     prompt="Extract the single most important statistic from this passage.",
     schema=KeyStat,
     output="{statistic} — {context}",   # template over schema fields
+    instruction_variants=[
+        "Identify the key statistic in this passage.",
+        "Extract the most important number from this passage.",
+    ],
 )
 
 rows = ta.augment(passage, tasks=[key_stat, "summarize"], model=model)
 ```
 
-The schema is enforced exactly via structured generation. `output=` also takes a callable, `rows=` gives full control over emitted rows, and generation knobs (`temperature=`, `variations=`, ...) pass straight through. Subclassing `BaseSingleChunkAugmentation` remains available for tasks that need custom input types or programmatic generation.
+The schema is enforced exactly via structured generation. `output=` also takes a callable, `rows=` gives full control over emitted rows, and generation knobs (`temperature=`, `variations=`, ...) pass straight through. Custom tasks can provide `instruction_variants=` for final-row instruction sampling. Subclassing `BaseSingleChunkAugmentation` remains available for tasks that need custom input types or programmatic generation.
 
 
 ## Why This Exists
@@ -371,6 +381,25 @@ rows = ta.augment(
     model=model,
 )
 ```
+
+Instruction-template sampling is enabled by default for `augment`, `aaugment`,
+`run_augmentation`, and batch runners. It only changes the emitted Alpaca
+`instruction` wording:
+
+```python
+rows = ta.augment(passage, tasks=["qa_pairs"], model=model)
+
+rows = ta.augment(
+    passage,
+    tasks=["qa_pairs"],
+    model=model,
+    sample_instruction_template=False,  # exact canonical instructions
+)
+```
+
+Built-in format-specific rows keep their format explicit in every variant, so
+markdown rows stay markdown, JSON rows stay JSON, and Python-list rows stay
+Python-list rows.
 
 Note: `ta.augment` operates on a single passage, so it covers the single-chunk tasks. The multi-chunk tasks (`comparison`, `retrieval`) take a list of passages and run through `run_augmentation` directly. Use `ta.list_multi_tasks()`, `ta.get_multi_task(...)`, and `ta.resolve_multi_tasks(...)` for stable named access:
 

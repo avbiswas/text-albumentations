@@ -42,6 +42,26 @@ class SummarizeAugmentation(BaseSingleChunkAugmentation[Summary]):
     selection_hint = "the passage is longer than a couple of sentences and has compressible content."
     adapters = (SummarizeAdapter(),)
     temperature = 0.3
+    instruction_templates = {
+        TLDR_INSTRUCTION: (
+            TLDR_INSTRUCTION,
+            "Write a one-sentence TLDR for this passage.",
+            "Condense this passage into one sentence.",
+            "Summarize the passage in one sentence.",
+            "Give a single-sentence summary of this passage.",
+            "Write a brief one-line summary of the passage.",
+            "Capture the main point of this passage in one sentence.",
+        ),
+        SUMMARY_INSTRUCTION: (
+            SUMMARY_INSTRUCTION,
+            "Summarize the main points of this passage concisely.",
+            "Write a brief summary covering the key ideas in this passage.",
+            "Give a concise overview of the passage's main points.",
+            "Summarize the important ideas from this passage.",
+            "Write a short summary of the passage.",
+            "Describe the passage's main content in a concise summary.",
+        ),
+    }
 
     def __init__(
         self,
