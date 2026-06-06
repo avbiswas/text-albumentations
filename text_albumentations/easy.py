@@ -369,6 +369,8 @@ def augment(
     postfilter: bool | str = False,
     sample_instruction_template: bool = True,
     save_to: str | None = None,
+    economy_mode: bool = False,
+    economy_bank_path: str = "economy_bank.jsonl",
 ) -> list[AlpacaDataset]:
     """Generate training rows from a passage with one call.
 
@@ -380,12 +382,37 @@ def augment(
     ``LocalHFModel``, or any custom ``ModelRuntime``). When omitted, an
     ``OpenAIModel`` is built from the ``TEXT_ALBUMENTATIONS_MODEL``,
     ``OPENAI_BASE_URL``, and ``OPENAI_API_KEY`` environment variables.
+
+    When ``economy_mode=True``, the single-shot selector is replaced by an
+    ``EconomyRouter`` that uses market-based auctions, wealth accumulation,
+    and population evolution to select and specialize augmentation agents
+    over time.
     """
     if model is None:
         model = OpenAIModel()
 
     mode = _infer_selection_mode(tasks, selection_mode)
     postfilter_prompt = _normalize_postfilter_prompt(postfilter)
+
+    if economy_mode:
+        if isinstance(tasks, dict):
+            raise TypeError("economy_mode does not accept probability maps.")
+        if prefilter and not prefilter_passage(text, model):
+            return []
+        from text_albumentations.economy_router import EconomyRouter
+        entries = _task_entries(tasks if tasks is not None else None)
+        router = EconomyRouter(
+            entries,
+            bank_path=economy_bank_path,
+            sample_instruction_template=sample_instruction_template,
+        )
+        dataset = run_augmentation(text, router, model)
+        dataset = _filter_rows(dataset, postfilter_prompt, model)
+        if add_reasoning:
+            dataset = add_reasoning_to_dataset(text, dataset, model)
+        if save_to is not None:
+            save_dataset(dataset, save_to)
+        return dataset
 
     if mode == "auto":
         if isinstance(tasks, dict):
@@ -458,12 +485,34 @@ async def aaugment(
     postfilter: bool | str = False,
     sample_instruction_template: bool = True,
     save_to: str | None = None,
+    economy_mode: bool = False,
+    economy_bank_path: str = "economy_bank.jsonl",
 ) -> list[AlpacaDataset]:
     if model is None:
         model = OpenAIModel(async_mode=True)
 
     mode = _infer_selection_mode(tasks, selection_mode)
     postfilter_prompt = _normalize_postfilter_prompt(postfilter)
+
+    if economy_mode:
+        if isinstance(tasks, dict):
+            raise TypeError("economy_mode does not accept probability maps.")
+        if prefilter and not await aprefilter_passage(text, model):
+            return []
+        from text_albumentations.economy_router import EconomyRouter
+        entries = _task_entries(tasks if tasks is not None else None)
+        router = EconomyRouter(
+            entries,
+            bank_path=economy_bank_path,
+            sample_instruction_template=sample_instruction_template,
+        )
+        dataset = await arun_augmentation(text, router, model)
+        dataset = await _afilter_rows(dataset, postfilter_prompt, model)
+        if add_reasoning:
+            dataset = await aadd_reasoning_to_dataset(text, dataset, model)
+        if save_to is not None:
+            save_dataset(dataset, save_to)
+        return dataset
 
     if mode == "auto":
         if isinstance(tasks, dict):
