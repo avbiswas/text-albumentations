@@ -252,6 +252,28 @@ model = ta.LocalMLXModel("mlx-community/Qwen3.5-4B-OptiQ-4bit")   # Apple Silico
 model = ta.LocalHFModel("google/gemma-3-1b-it")                   # Transformers
 ```
 
+**Google Vertex AI:**
+
+Install the optional dependency and authenticate with Application Default
+Credentials (ADC):
+
+```bash
+pip install "text-albumentations[vertex]"
+gcloud auth application-default login
+```
+
+```python
+model = ta.VertexAIModel(
+    "gemini-2.5-flash",
+    project="your-gcp-project",
+    location="us-central1",
+)
+rows = ta.augment(text, tasks=["bullets", "qa_pairs"], model=model)
+```
+
+`project` can also come from `GOOGLE_CLOUD_PROJECT` and `location` from
+`GOOGLE_CLOUD_LOCATION`. Vertex AI uses Gemini's native structured output.
+
 For async pipelines, `OpenAIModel` takes `async_mode=True` and `total_concurrent_calls=`:
 ```python
 model = ta.OpenAIModel("gpt-5-mini", base_url=..., api_key=...,
