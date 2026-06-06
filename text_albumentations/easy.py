@@ -301,12 +301,8 @@ def _filter_rows(
 ) -> list[AlpacaDataset]:
     if prompt is None:
         return rows
-    kept = []
-    for row in rows:
-        assessment = postfilter(row.model_dump(), prompt, model=model)
-        if assessment.is_quality:
-            kept.append(row)
-    return kept
+    from text_albumentations.batch_postfilter import batch_filter_rows
+    return batch_filter_rows(rows, prompt, model)
 
 
 async def _afilter_rows(
@@ -316,14 +312,8 @@ async def _afilter_rows(
 ) -> list[AlpacaDataset]:
     if prompt is None:
         return rows
-    assessments = await asyncio.gather(
-        *[apostfilter(row.model_dump(), prompt, model=model) for row in rows]
-    )
-    return [
-        row
-        for row, assessment in zip(rows, assessments, strict=True)
-        if assessment.is_quality
-    ]
+    from text_albumentations.batch_postfilter import abatch_filter_rows
+    return await abatch_filter_rows(rows, prompt, model)
 
 
 def select_tasks(

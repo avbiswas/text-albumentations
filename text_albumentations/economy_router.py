@@ -28,7 +28,6 @@ from text_albumentations.economy import (
     WealthBank,
 )
 from text_albumentations.meta import AugmentationEntry
-from text_albumentations.postfilter import PostfilterAssessment, postfilter, apostfilter
 from text_albumentations.runner import arun_augmentation, run_augmentation
 from text_albumentations.runtime import ModelRuntime
 from text_albumentations.utils import AlpacaDataset
@@ -275,33 +274,32 @@ class EconomyRouter(BaseSingleChunkAugmentation[EconomySelection]):
         if not dataset:
             return {name: 0.0 for name in winners}
 
+        from text_albumentations.batch_postfilter import batch_postfilter
+
+        # Batch-assess ALL rows in one call (or a few batched calls).
+        all_assessments = batch_postfilter(
+            [row.model_dump() for row in dataset],
+            self._reward_prompt,
+            model=runtime,
+        )
+
+        # Attribute rows to agents round-robin.
         rewards: dict[str, float] = {}
-        # Assign rows to agents round-robin (approximate attribution).
-        # In a richer implementation, each row would carry its agent name.
         per_agent = len(dataset) // max(len(winners), 1)
         remainder = len(dataset) % max(len(winners), 1)
 
         idx = 0
         for i, name in enumerate(winners):
             count = per_agent + (1 if i < remainder else 0)
-            agent_rows = dataset[idx : idx + count]
+            agent_assessments = all_assessments[idx : idx + count]
             idx += count
 
-            if not agent_rows:
+            if not agent_assessments:
                 rewards[name] = 0.0
                 continue
 
-            passed = 0
-            for row in agent_rows:
-                assessment: PostfilterAssessment = postfilter(
-                    row.model_dump(),
-                    self._reward_prompt,
-                    model=runtime,
-                )
-                if assessment.is_quality:
-                    passed += 1
-
-            rewards[name] = passed / len(agent_rows)
+            passed = sum(1 for a in agent_assessments if a.is_quality)
+            rewards[name] = passed / len(agent_assessments)
 
         return rewards
 
@@ -312,10 +310,16 @@ class EconomyRouter(BaseSingleChunkAugmentation[EconomySelection]):
         runtime: ModelRuntime,
     ) -> dict[str, float]:
         """Async variant of reward computation."""
-        import asyncio
-
         if not dataset:
             return {name: 0.0 for name in winners}
+
+        from text_albumentations.batch_postfilter import abatch_postfilter
+
+        all_assessments = await abatch_postfilter(
+            [row.model_dump() for row in dataset],
+            self._reward_prompt,
+            model=runtime,
+        )
 
         rewards: dict[str, float] = {}
         per_agent = len(dataset) // max(len(winners), 1)
@@ -324,25 +328,15 @@ class EconomyRouter(BaseSingleChunkAugmentation[EconomySelection]):
         idx = 0
         for i, name in enumerate(winners):
             count = per_agent + (1 if i < remainder else 0)
-            agent_rows = dataset[idx : idx + count]
+            agent_assessments = all_assessments[idx : idx + count]
             idx += count
 
-            if not agent_rows:
+            if not agent_assessments:
                 rewards[name] = 0.0
                 continue
 
-            assessments = await asyncio.gather(
-                *[
-                    apostfilter(
-                        row.model_dump(),
-                        self._reward_prompt,
-                        model=runtime,
-                    )
-                    for row in agent_rows
-                ]
-            )
-            passed = sum(1 for a in assessments if a.is_quality)
-            rewards[name] = passed / len(agent_rows)
+            passed = sum(1 for a in agent_assessments if a.is_quality)
+            rewards[name] = passed / len(agent_assessments)
 
         return rewards
 
