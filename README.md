@@ -169,6 +169,16 @@ Built-in augmentations:
 | `style_transfer` | Rewrites the passage in a target style (`eli5`, `formal`, `casual`, or a custom description). |
 | `backtranslation` | Generates the instruction the passage would be the ideal answer to (instruction backtranslation); the passage itself becomes the output. |
 | `counterfactual` | Alters a central claim of the passage and asks what would follow, with a passage-grounded answer. |
+| `evidence_selection` | Builds claim-to-evidence examples where the model chooses the supporting quote from candidate quotes. |
+| `claim_verification` | Generates supported, contradicted, or not-enough-information claim verification rows. |
+| `entity_extraction` | Extracts named entities and domain concepts with typed labels and short contexts. |
+| `definition_extraction` | Extracts passage-grounded term definitions with verified supporting quotes. |
+| `method_steps` | Converts process, method, workflow, or algorithm passages into ordered steps. |
+| `structured_records` | Extracts subject-attribute-value records as JSON and concise text facts. |
+| `section_heading` | Generates local section or subsection headings with short rationales. |
+| `query_generation` | Generates search queries that could retrieve the passage and reverse query-to-passage rows. |
+| `distractor_qa` | Produces multiple-choice QA rows with plausible distractors and explanations. |
+| `error_correction` | Creates corrupted passage variants and correction rows targeting the original passage. |
 | `comparison` | Compares two passages and generates a structured comparison. |
 | `retrieval` | Builds retrieval-style supervision by pairing questions with the passage that answers them, or with no-answer cases. |
 

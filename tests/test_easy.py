@@ -28,6 +28,16 @@ EXPECTED_TASKS = {
     "style_transfer",
     "backtranslation",
     "counterfactual",
+    "evidence_selection",
+    "claim_verification",
+    "entity_extraction",
+    "definition_extraction",
+    "method_steps",
+    "structured_records",
+    "section_heading",
+    "query_generation",
+    "distractor_qa",
+    "error_correction",
 }
 
 

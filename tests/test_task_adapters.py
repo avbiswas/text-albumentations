@@ -5,14 +5,63 @@ from text_albumentations.tasks.backtranslation import (
     BacktranslationAdapter,
 )
 from text_albumentations.tasks.bullets import bullet_augmentation
+from text_albumentations.tasks.claim_verification import (
+    ClaimVerificationAdapter,
+    claim_verification_augmentation,
+    ClaimVerificationItem,
+    ClaimVerifications,
+    JSON_INSTRUCTION as CLAIM_JSON_INSTRUCTION,
+)
 from text_albumentations.tasks.classification import ClassificationAdapter, PassageLabels
 from text_albumentations.tasks.cloze import cloze_augmentation
 from text_albumentations.tasks.counterfactual import Counterfactual, CounterfactualAdapter
+from text_albumentations.tasks.definition_extraction import (
+    DefinitionExtractionAdapter,
+    definition_extraction_augmentation,
+    DefinitionItem,
+    Definitions,
+    QUOTE_INSTRUCTION,
+)
+from text_albumentations.tasks.distractor_qa import (
+    DistractorQaAdapter,
+    distractor_qa_augmentation,
+    DISTRACTOR_INSTRUCTION,
+    KeywordReplacement,
+    MultipleChoiceQuestion,
+    MultipleChoiceQuestions,
+    VALIDITY_INSTRUCTION,
+)
+from text_albumentations.tasks.entity_extraction import (
+    Entity,
+    EntityExtractionAdapter,
+    entity_extraction_augmentation,
+    EntityList,
+    EXTRACT_INSTRUCTION as ENTITY_EXTRACT_INSTRUCTION,
+)
+from text_albumentations.tasks.error_correction import (
+    ErrorCorrection,
+    ErrorCorrectionAdapter,
+    error_correction_augmentation,
+)
+from text_albumentations.tasks.evidence_selection import (
+    EvidenceSelectionAdapter,
+    evidence_selection_augmentation,
+    EvidenceSelectionItem,
+    EvidenceSelections,
+    QUOTE_SUPPORT_INSTRUCTION,
+)
 from text_albumentations.tasks.extractive_qa import (
     ExtractiveQa,
     ExtractiveQaAdapter,
     ExtractiveQaItem,
     quote_in_passage,
+)
+from text_albumentations.tasks.method_steps import (
+    MethodStep,
+    MethodSteps,
+    MethodStepsAdapter,
+    method_steps_augmentation,
+    MISSING_STEP_INSTRUCTION,
 )
 from text_albumentations.tasks.qa_pairs import (
     JsonQaAdapter,
@@ -21,7 +70,24 @@ from text_albumentations.tasks.qa_pairs import (
     QAList,
     qa_pair_augmentation,
 )
+from text_albumentations.tasks.query_generation import (
+    query_generation_augmentation,
+    QueryGenerationAdapter,
+    SearchQueries,
+)
+from text_albumentations.tasks.section_heading import (
+    SectionHeading,
+    SectionHeadingAdapter,
+    section_heading_augmentation,
+)
 from text_albumentations.tasks.style_transfer import StyleTransferAugmentation
+from text_albumentations.tasks.structured_records import (
+    JSON_INSTRUCTION as RECORDS_JSON_INSTRUCTION,
+    StructuredRecord,
+    StructuredRecords,
+    StructuredRecordsAdapter,
+    structured_records_augmentation,
+)
 from text_albumentations.tasks.summarize import Summary, SummarizeAdapter, summarize_augmentation
 from text_albumentations.tasks.title import TitleAdapter, TitleHeadline
 from text_albumentations.tasks.triplets import triplet_augmentation
@@ -165,6 +231,45 @@ class TestInstructionTemplates:
             for default, variants in templates.items():
                 assert variants[0] == default
 
+    def test_new_task_instruction_templates_default_first(self):
+        for augmentation in (
+            claim_verification_augmentation,
+            definition_extraction_augmentation,
+            distractor_qa_augmentation,
+            entity_extraction_augmentation,
+            error_correction_augmentation,
+            evidence_selection_augmentation,
+            method_steps_augmentation,
+            query_generation_augmentation,
+            section_heading_augmentation,
+            structured_records_augmentation,
+        ):
+            assert augmentation.instruction_templates
+            for default, variants in augmentation.instruction_templates.items():
+                assert variants[0] == default
+
+    def test_sensitive_new_task_templates_preserve_semantics(self):
+        checks = [
+            (claim_verification_augmentation, CLAIM_JSON_INSTRUCTION, ("json",)),
+            (definition_extraction_augmentation, QUOTE_INSTRUCTION, ("quote", "evidence")),
+            (
+                distractor_qa_augmentation,
+                DISTRACTOR_INSTRUCTION,
+                ("incorrect", "wrong", "distractor"),
+            ),
+            (distractor_qa_augmentation, VALIDITY_INSTRUCTION, ("invalid",)),
+            (entity_extraction_augmentation, ENTITY_EXTRACT_INSTRUCTION, ("json",)),
+            (evidence_selection_augmentation, QUOTE_SUPPORT_INSTRUCTION, ("yes", "no")),
+            (method_steps_augmentation, MISSING_STEP_INSTRUCTION, ("missing", "omitted")),
+            (structured_records_augmentation, RECORDS_JSON_INSTRUCTION, ("json",)),
+        ]
+        for augmentation, instruction, required_words in checks:
+            variants = augmentation.instruction_templates[instruction]
+            assert all(
+                any(required_word in variant.lower() for required_word in required_words)
+                for variant in variants
+            )
+
 
 class TestCounterfactual:
     def test_instruction_is_self_contained(self, passage):
@@ -179,6 +284,189 @@ class TestCounterfactual:
         assert len(rows) == 1
         assert "Suppose the Transformer required recurrence." in rows[0].instruction
         assert "What would follow for training time?" in rows[0].instruction
+
+
+class TestNewTasks:
+    def test_evidence_selection_keeps_verified_candidate(self, passage):
+        output = EvidenceSelections(
+            items=[
+                EvidenceSelectionItem(
+                    claim="The Transformer does not use recurrence.",
+                    candidate_quotes=[
+                        "dispensing with recurrence and convolutions entirely",
+                        "The best performing models also connect the encoder and decoder",
+                    ],
+                    supporting_quote="dispensing with recurrence and convolutions entirely",
+                    rationale="The quote says the model dispenses with recurrence.",
+                ),
+                EvidenceSelectionItem(
+                    claim="The model was trained on C4.",
+                    candidate_quotes=["trained on C4", "trained on Wikipedia"],
+                    supporting_quote="trained on C4",
+                    rationale="This quote is not in the passage.",
+                ),
+            ]
+        )
+        rows = EvidenceSelectionAdapter().convert(passage, output)
+        assert len(rows) == 4
+        assert rows[0].output == "dispensing with recurrence and convolutions entirely"
+        assert rows[-2].output == "yes"
+        assert rows[-1].output == "no"
+        assert all("Write the claim supported" not in row.instruction for row in rows)
+
+    def test_claim_verification_emits_label_and_evidence(self, passage):
+        output = ClaimVerifications(
+            items=[
+                ClaimVerificationItem(
+                    claim="The model uses attention.",
+                    label="supported",
+                    evidence="The passage says it is based on attention mechanisms.",
+                )
+            ]
+        )
+        rows = ClaimVerificationAdapter().convert(passage, output)
+        assert len(rows) == 4
+        assert rows[0].output.startswith("Label: supported")
+        assert rows[1].output == "supported"
+        assert '"label": "supported"' in rows[3].output
+
+    def test_entity_extraction_emits_collection_and_type_rows(self, passage):
+        output = EntityList(
+            entities=[
+                Entity(
+                    name="Transformer",
+                    type="method",
+                    context="A network architecture.",
+                )
+            ]
+        )
+        rows = EntityExtractionAdapter().convert(passage, output)
+        assert len(rows) == 2
+        assert '"name": "Transformer"' in rows[0].output
+        assert rows[1].output == "method"
+
+    def test_definition_extraction_requires_verified_quote(self, passage):
+        output = Definitions(
+            definitions=[
+                DefinitionItem(
+                    term="Transformer",
+                    definition="A network architecture based on attention.",
+                    supporting_quote="the Transformer, based solely on attention mechanisms",
+                ),
+                DefinitionItem(
+                    term="C4",
+                    definition="A dataset.",
+                    supporting_quote="trained on the C4 dataset",
+                ),
+            ]
+        )
+        rows = DefinitionExtractionAdapter().convert(passage, output)
+        assert len(rows) == 2
+        assert rows[0].output == "A network architecture based on attention."
+
+    def test_method_steps_formats_numbered_steps(self, passage):
+        output = MethodSteps(
+            process_name="Sequence modeling",
+            steps=[
+                MethodStep(step="Encode the input sequence."),
+                MethodStep(step="Decode the output sequence."),
+            ]
+        )
+        rows = MethodStepsAdapter().convert(passage, output)
+        assert len(rows) == 5
+        assert rows[0].output == "1. Encode the input sequence.\n2. Decode the output sequence."
+        assert rows[1].output == "Sequence modeling"
+        assert rows[-1].output == "Decode the output sequence."
+        assert all("How many ordered steps" not in row.instruction for row in rows)
+
+    def test_structured_records_emits_json_and_text(self, passage):
+        output = StructuredRecords(
+            records=[
+                StructuredRecord(
+                    subject="Transformer",
+                    attribute="basis",
+                    value="attention mechanisms",
+                )
+            ]
+        )
+        rows = StructuredRecordsAdapter().convert(passage, output)
+        assert len(rows) == 5
+        assert '"attribute": "basis"' in rows[0].output
+        assert "Transformer - basis: attention mechanisms" in rows[1].output
+        assert rows[2].output == "attention mechanisms"
+        assert rows[3].output == "basis"
+        assert rows[4].output == "Transformer"
+        assert all("Turn this structured record" not in row.instruction for row in rows)
+
+    def test_section_heading_emits_heading_and_rationale(self, passage):
+        rows = SectionHeadingAdapter().convert(
+            passage,
+            SectionHeading(
+                heading="Attention-Based Sequence Models",
+                rationale="The passage describes a model based on attention.",
+            ),
+        )
+        assert [row.output for row in rows] == [
+            "Attention-Based Sequence Models",
+            "The passage describes a model based on attention.",
+        ]
+
+    def test_query_generation_emits_query_and_reverse_rows(self, passage):
+        rows = QueryGenerationAdapter().convert(
+            passage,
+            SearchQueries(queries=["transformer attention sequence transduction"]),
+        )
+        assert len(rows) == 2
+        assert rows[0].output == "transformer attention sequence transduction"
+        assert rows[1].output == passage
+
+    def test_distractor_qa_drops_duplicate_choices(self, passage):
+        output = MultipleChoiceQuestions(
+            questions=[
+                MultipleChoiceQuestion(
+                    question="What mechanism does the Transformer use?",
+                    correct_answer="attention",
+                    distractors=["recurrence", "convolutions"],
+                    explanation="The passage says it is based solely on attention.",
+                    keyword_replacements=[
+                        KeywordReplacement(
+                            keyword="attention",
+                            replacement="recurrence",
+                        )
+                    ],
+                ),
+                MultipleChoiceQuestion(
+                    question="Duplicate?",
+                    correct_answer="attention",
+                    distractors=["attention", "convolutions"],
+                    explanation="Duplicate choices are malformed.",
+                    keyword_replacements=[
+                        KeywordReplacement(
+                            keyword="attention",
+                            replacement="recurrence",
+                        )
+                    ],
+                ),
+            ]
+        )
+        rows = DistractorQaAdapter().convert(passage, output)
+        assert len(rows) == 7
+        assert "Answer: attention" in rows[0].output
+        assert rows[1].output == "attention"
+        assert rows[-3].output == "invalid"
+        assert rows[-2].output == passage
+        assert rows[-1].output == "attention -> recurrence"
+
+    def test_error_correction_outputs_original_passage(self, passage):
+        rows = ErrorCorrectionAdapter().convert(
+            passage,
+            ErrorCorrection(
+                corrupted_passage="The Transformer relies on recurrence.",
+                correction_notes="Replace recurrence with attention mechanisms.",
+            ),
+        )
+        assert rows[0].output == passage
+        assert rows[1].output == "Replace recurrence with attention mechanisms."
 
 
 class TestSimpleAdapters:
