@@ -84,6 +84,20 @@ def test_augment_unknown_task_raises(passage):
         ta.augment(passage, tasks=["nope"], model=FakeModel({}))
 
 
+def test_augment_rejects_massive_single_passage_before_model_call():
+    model = FakeModel({})
+    with pytest.raises(ValueError, match="expects one passage"):
+        ta.augment("x" * 3001, tasks=["title"], model=model)
+    assert model.calls == []
+
+
+def test_select_tasks_rejects_massive_single_passage_before_model_call():
+    model = FakeModel({})
+    with pytest.raises(ValueError, match="chunk_text_by_chars"):
+        ta.select_tasks("x" * 3001, tasks=["title"], model=model)
+    assert model.calls == []
+
+
 def test_augment_mixes_names_and_instances(passage):
     model = FakeModel(
         {
@@ -271,6 +285,14 @@ async def test_aaugment_sample_mode_prefilter_rejects_low_quality(monkeypatch):
     assert rows == []
     assert len(model.calls) == 1
     assert model.calls[0][1] == "PassageQuality"
+
+
+@pytest.mark.anyio
+async def test_aaugment_rejects_massive_single_passage_before_model_call():
+    model = FakeModel({})
+    with pytest.raises(ValueError, match="generate_rows_from_long_text"):
+        await ta.aaugment("x" * 3001, tasks=["title"], model=model)
+    assert model.calls == []
 
 
 def test_augment_does_not_postfilter_rows_in_main_path(passage):

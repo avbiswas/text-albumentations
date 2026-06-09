@@ -35,6 +35,7 @@ from text_albumentations.runtime import ModelRuntime
 from text_albumentations.utils import AlpacaDataset, save_dataset
 
 SelectionMode = Literal["auto", "explicit", "sample"]
+MAX_SINGLE_PASSAGE_CHARS = 3_000
 TaskName = Literal[
     "backtranslation",
     "bullets",
@@ -70,6 +71,16 @@ TaskSpec = (
 @dataclass(frozen=True)
 class TaskSelection:
     selected_tasks: list[TaskName]
+
+
+def _validate_single_passage_size(text: str) -> None:
+    if len(text) > MAX_SINGLE_PASSAGE_CHARS:
+        raise ValueError(
+            "ta.augment expects one passage, but received "
+            f"{len(text):,} characters. For long documents or corpora, use "
+            "ta.chunk_text_by_chars(...), ta.generate_rows_from_long_text(...), "
+            "or ta.save_long_text_dataset(...)."
+        )
 
 
 def _build_task_registry() -> dict[str, BaseSingleChunkAugmentation]:
@@ -302,6 +313,7 @@ def select_tasks(
     model: ModelRuntime | None = None,
     prefilter: bool = True,
 ) -> TaskSelection:
+    _validate_single_passage_size(text)
     if model is None:
         model = OpenAIModel()
     if prefilter and not prefilter_passage(text, model):
@@ -318,6 +330,7 @@ async def aselect_tasks(
     model: ModelRuntime | None = None,
     prefilter: bool = True,
 ) -> TaskSelection:
+    _validate_single_passage_size(text)
     if model is None:
         model = OpenAIModel(async_mode=True)
     if prefilter and not await aprefilter_passage(text, model):
@@ -351,6 +364,7 @@ def augment(
     """
     if model is None:
         model = OpenAIModel()
+    _validate_single_passage_size(text)
 
     mode = _infer_selection_mode(tasks, selection_mode)
 
@@ -426,6 +440,7 @@ async def aaugment(
 ) -> list[AlpacaDataset]:
     if model is None:
         model = OpenAIModel(async_mode=True)
+    _validate_single_passage_size(text)
 
     mode = _infer_selection_mode(tasks, selection_mode)
 

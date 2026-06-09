@@ -149,7 +149,6 @@ The project currently supports:
 - response-format control for the Alpaca `output` field
 - sync and async generation
 - model primitives: `OpenAIModel` (any OpenAI-compatible endpoint), `LocalMLXModel`, `LocalHFModel`
-- long-text ingestion with fixed-size character chunking
 - JSONL dataset writing
 
 Built-in augmentations:
@@ -447,6 +446,12 @@ from text_albumentations import run_augmentation
 rows = run_augmentation([passage_a, passage_b], ta.get_multi_task("comparison"), model)
 ```
 
+For corpora, build passage groups in your own ingestion pipeline, then call
+`run_augmentation(...)` on each group. Grouping policy is application-specific:
+adjacent chunks, search results, same-document sections, and sampled negatives
+all produce different retrieval data. See
+`examples/retrieval_external_groups.py` for a complete script.
+
 Retrieval can generate many internal model calls because it extracts questions
 and then writes positive and no-answer reasons. Use `RetrievalAugmentation` to
 cap work for high-throughput runs:
@@ -528,20 +533,11 @@ rows = run_batch_augmentation(
 )
 ```
 
-### Long Text To JSONL
+### Corpus Loops
 
-```python
-from text_albumentations import save_long_text_dataset
-from text_albumentations.tasks.bullets import bullet_augmentation
-
-save_long_text_dataset(
-    text=long_text,
-    output_jsonl="out.jsonl",
-    augmentation=bullet_augmentation,
-    runtime=model,
-    chunk_size_chars=300,
-)
-```
+`ta.augment(...)` expects one passage and rejects inputs longer than 3,000
+characters. For long documents or corpora, split the text into passage-sized
+chunks and manage the loop in your own ingestion pipeline.
 
 ### Augmentation Knobs
 
