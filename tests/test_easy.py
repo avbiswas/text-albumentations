@@ -6,7 +6,6 @@ import pytest
 
 import text_albumentations as ta
 from text_albumentations.meta import MetaSelection, PassageQuality
-from text_albumentations.postfilter import PostfilterAssessment
 from text_albumentations.reasoning import ReasoningTrace
 from text_albumentations.tasks.style_transfer import StyleRewrite, StyleTransferAugmentation
 from text_albumentations.tasks.summarize import Summary
@@ -274,20 +273,17 @@ async def test_aaugment_sample_mode_prefilter_rejects_low_quality(monkeypatch):
     assert model.calls[0][1] == "PassageQuality"
 
 
-def test_augment_postfilter_keeps_only_quality_rows(passage):
+def test_augment_does_not_postfilter_rows_in_main_path(passage):
     model = FakeModel(
         {
             "TitleHeadline": TitleHeadline(title="T", headline="H"),
-            "PostfilterAssessment": PostfilterAssessment(
-                is_quality=False,
-                reason="Bad row.",
-            ),
         }
     )
 
-    rows = ta.augment(passage, tasks=["title"], model=model, postfilter=True)
+    rows = ta.augment(passage, tasks=["title"], model=model)
 
-    assert rows == []
+    assert [row.output for row in rows] == ["T", "H"]
+    assert all(call[1] != "PostfilterAssessment" for call in model.calls)
 
 
 def test_augment_add_reasoning(passage):

@@ -26,7 +26,6 @@ from text_albumentations.meta import (
     prefilter_passage,
 )
 from text_albumentations.models import OpenAIModel
-from text_albumentations.postfilter import apostfilter, postfilter
 from text_albumentations.reasoning import (
     aadd_reasoning_to_dataset,
     add_reasoning_to_dataset,
@@ -67,14 +66,6 @@ TaskSpec = (
     | dict[TaskName, float]
     | None
 )
-
-DEFAULT_POSTFILTER_PROMPT = """\
-A quality generated training datapoint should be useful for supervised fine-tuning.
-Keep the row only if the instruction is clear, the input contains enough context,
-and the output directly satisfies the instruction without contradiction,
-unsupported claims, truncation, or malformed boilerplate.
-"""
-
 
 @dataclass(frozen=True)
 class TaskSelection:
@@ -304,48 +295,6 @@ def _sample_task_names(tasks: dict[TaskName, float]) -> list[TaskName]:
     return selected
 
 
-def _normalize_postfilter_prompt(postfilter_setting: bool | str) -> str | None:
-    if postfilter_setting is False:
-        return None
-    if postfilter_setting is True:
-        return DEFAULT_POSTFILTER_PROMPT
-    if not postfilter_setting.strip():
-        raise ValueError("postfilter criteria must be non-empty.")
-    return postfilter_setting
-
-
-def _filter_rows(
-    rows: list[AlpacaDataset],
-    prompt: str | None,
-    model: ModelRuntime,
-) -> list[AlpacaDataset]:
-    if prompt is None:
-        return rows
-    kept = []
-    for row in rows:
-        assessment = postfilter(row.model_dump(), prompt, model=model)
-        if assessment.is_quality:
-            kept.append(row)
-    return kept
-
-
-async def _afilter_rows(
-    rows: list[AlpacaDataset],
-    prompt: str | None,
-    model: ModelRuntime,
-) -> list[AlpacaDataset]:
-    if prompt is None:
-        return rows
-    assessments = await asyncio.gather(
-        *[apostfilter(row.model_dump(), prompt, model=model) for row in rows]
-    )
-    return [
-        row
-        for row, assessment in zip(rows, assessments, strict=True)
-        if assessment.is_quality
-    ]
-
-
 def select_tasks(
     text: str,
     tasks: list[TaskName] | tuple[TaskName, ...] | None = None,
@@ -386,7 +335,6 @@ def augment(
     model: ModelRuntime | None = None,
     add_reasoning: bool = False,
     prefilter: bool = True,
-    postfilter: bool | str = False,
     sample_instruction_template: bool = True,
     save_to: str | None = None,
 ) -> list[AlpacaDataset]:
@@ -405,7 +353,6 @@ def augment(
         model = OpenAIModel()
 
     mode = _infer_selection_mode(tasks, selection_mode)
-    postfilter_prompt = _normalize_postfilter_prompt(postfilter)
 
     if mode == "auto":
         if isinstance(tasks, dict):
@@ -458,7 +405,6 @@ def augment(
     else:
         raise ValueError("selection_mode must be one of: auto, explicit, sample.")
 
-    dataset = _filter_rows(dataset, postfilter_prompt, model)
     if add_reasoning:
         dataset = add_reasoning_to_dataset(text, dataset, model)
 
@@ -475,7 +421,6 @@ async def aaugment(
     model: ModelRuntime | None = None,
     add_reasoning: bool = False,
     prefilter: bool = True,
-    postfilter: bool | str = False,
     sample_instruction_template: bool = True,
     save_to: str | None = None,
 ) -> list[AlpacaDataset]:
@@ -483,7 +428,6 @@ async def aaugment(
         model = OpenAIModel(async_mode=True)
 
     mode = _infer_selection_mode(tasks, selection_mode)
-    postfilter_prompt = _normalize_postfilter_prompt(postfilter)
 
     if mode == "auto":
         if isinstance(tasks, dict):
@@ -523,7 +467,6 @@ async def aaugment(
         ]
     )
     dataset = [row for rows in datasets for row in rows]
-    dataset = await _afilter_rows(dataset, postfilter_prompt, model)
     if add_reasoning:
         dataset = await aadd_reasoning_to_dataset(text, dataset, model)
     if save_to is not None:

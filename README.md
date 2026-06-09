@@ -139,7 +139,7 @@ The project currently supports:
 - **one-call generation**: `ta.augment(text, model=model)` is the whole pipeline
 - **auto-pick (smart switch)**: LLM-driven selection of which augmentations fit a given passage, guided by per-task `selection_hint`s and grammar-constrained to real task names
 - **prefilter**: lightweight dedicated LLM call (`PassageQuality`) that rejects low-quality passages before any generation runs — active in both `auto` and `sample` modes
-- **postfilter**: optional rejection of low-quality generated training rows after generation
+- **standalone postfilter**: optional one-off judging of individual datapoints with `ta.postfilter(...)`
 - **reasoning traces**: post-hoc CoT reasoning generated for each training row
 - **terse custom tasks**: `ta.task(prompt=..., schema=...)` defines a new augmentation without classes
 - single-chunk and multi-chunk augmentations
@@ -504,12 +504,9 @@ else:
 
 Async pipelines can use `await ta.apostfilter(...)`.
 
-High-level `augment` / `aaugment` can also postfilter generated rows before returning them:
-
-```python
-rows = ta.augment(passage, model=model, postfilter=True)
-rows = await ta.aaugment(passage, model=model, postfilter=True)
-```
+`augment` / `aaugment` do not run row-level postfiltering. This keeps the main
+generation path from making one extra judge call per emitted row. Use
+`ta.postfilter(...)` explicitly on selected rows when you need row-level review.
 
 ### Batch Augmentation Over Multiple Passages
 
