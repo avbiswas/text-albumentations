@@ -13,6 +13,12 @@ from text_albumentations.tasks.claim_verification import (
     JSON_INSTRUCTION as CLAIM_JSON_INSTRUCTION,
 )
 from text_albumentations.tasks.classification import ClassificationAdapter, PassageLabels
+from text_albumentations.tasks.claim_evidence_plan import (
+    ClaimEvidenceAdapter,
+    claim_evidence_augmentation,
+    ClaimEvidencePlan,
+    EVIDENCE_SELECTION_INSTRUCTION as CLAIM_EVIDENCE_SELECTION_INSTRUCTION,
+)
 from text_albumentations.tasks.cloze import cloze_augmentation
 from text_albumentations.tasks.counterfactual import Counterfactual, CounterfactualAdapter
 from text_albumentations.tasks.definition_extraction import (
@@ -79,6 +85,20 @@ from text_albumentations.tasks.section_heading import (
     SectionHeading,
     SectionHeadingAdapter,
     section_heading_augmentation,
+)
+from text_albumentations.tasks.sentence_contrast_plan import (
+    ContrastReplacement,
+    SentenceContrastAdapter,
+    sentence_contrast_augmentation,
+    SentenceContrastPlan,
+    REPLACEMENT_INSTRUCTION as SENTENCE_REPLACEMENT_INSTRUCTION,
+)
+from text_albumentations.tasks.sentence_equivalence_plan import (
+    EQUIVALENCE_INSTRUCTION as SENTENCE_EQUIVALENCE_INSTRUCTION,
+    EquivalentRewrite,
+    SentenceEquivalenceAdapter,
+    sentence_equivalence_augmentation,
+    SIMILARITY_INSTRUCTION as SENTENCE_SIMILARITY_INSTRUCTION,
 )
 from text_albumentations.tasks.style_transfer import StyleTransferAugmentation
 from text_albumentations.tasks.structured_records import (
@@ -234,6 +254,7 @@ class TestInstructionTemplates:
     def test_new_task_instruction_templates_default_first(self):
         for augmentation in (
             claim_verification_augmentation,
+            claim_evidence_augmentation,
             definition_extraction_augmentation,
             distractor_qa_augmentation,
             entity_extraction_augmentation,
@@ -242,6 +263,8 @@ class TestInstructionTemplates:
             method_steps_augmentation,
             query_generation_augmentation,
             section_heading_augmentation,
+            sentence_contrast_augmentation,
+            sentence_equivalence_augmentation,
             structured_records_augmentation,
         ):
             assert augmentation.instruction_templates
@@ -251,6 +274,11 @@ class TestInstructionTemplates:
     def test_sensitive_new_task_templates_preserve_semantics(self):
         checks = [
             (claim_verification_augmentation, CLAIM_JSON_INSTRUCTION, ("json",)),
+            (
+                claim_evidence_augmentation,
+                CLAIM_EVIDENCE_SELECTION_INSTRUCTION,
+                ("quote", "evidence"),
+            ),
             (definition_extraction_augmentation, QUOTE_INSTRUCTION, ("quote", "evidence")),
             (
                 distractor_qa_augmentation,
@@ -262,6 +290,21 @@ class TestInstructionTemplates:
             (evidence_selection_augmentation, QUOTE_SUPPORT_INSTRUCTION, ("yes", "no")),
             (method_steps_augmentation, MISSING_STEP_INSTRUCTION, ("missing", "omitted")),
             (structured_records_augmentation, RECORDS_JSON_INSTRUCTION, ("json",)),
+            (
+                sentence_contrast_augmentation,
+                SENTENCE_REPLACEMENT_INSTRUCTION,
+                ("replacement", "wrong", "invalid", "contradiction"),
+            ),
+            (
+                sentence_equivalence_augmentation,
+                SENTENCE_SIMILARITY_INSTRUCTION,
+                ("similarity", "0.0", "1.0"),
+            ),
+            (
+                sentence_equivalence_augmentation,
+                SENTENCE_EQUIVALENCE_INSTRUCTION,
+                ("equivalent", "meaning"),
+            ),
         ]
         for augmentation, instruction, required_words in checks:
             variants = augmentation.instruction_templates[instruction]
@@ -287,6 +330,81 @@ class TestCounterfactual:
 
 
 class TestNewTasks:
+    def test_sentence_equivalence_emits_similarity_equivalence_and_nli(self, passage):
+        output = EquivalentRewrite(
+            source_sentence=(
+                "The best performing models also connect the encoder and decoder "
+                "through an attention mechanism."
+            ),
+            equivalent_sentences=[
+                "The top models link the encoder and decoder using attention."
+            ],
+        )
+
+        rows = SentenceEquivalenceAdapter().convert(passage, output)
+
+        assert len(rows) == 4
+        assert [row.output for row in rows] == [
+            "1.0",
+            "equivalent",
+            "entailment",
+            "entailment",
+        ]
+
+    def test_sentence_equivalence_drops_unverified_source(self, passage):
+        output = EquivalentRewrite(
+            source_sentence="This sentence is not in the passage.",
+            equivalent_sentences=["This sentence is absent from the passage."],
+        )
+
+        assert SentenceEquivalenceAdapter().convert(passage, output) == []
+
+    def test_sentence_contrast_applies_replacements_procedurally(self, passage):
+        output = SentenceContrastPlan(
+            source_sentence=(
+                "The best performing models also connect the encoder and decoder "
+                "through an attention mechanism."
+            ),
+            replacements=[
+                ContrastReplacement(
+                    original="attention",
+                    replacement="recurrence",
+                    contradiction_type="attribute",
+                )
+            ],
+        )
+
+        rows = SentenceContrastAdapter().convert(passage, output)
+
+        assert len(rows) == 5
+        assert [row.output for row in rows] == [
+            "0.25",
+            "not_equivalent",
+            "contradiction",
+            output.source_sentence,
+            "attention -> recurrence",
+        ]
+        assert "recurrence mechanism" in rows[0].input
+
+    def test_claim_evidence_plan_requires_verified_quotes(self, passage):
+        output = ClaimEvidencePlan(
+            claim="The Transformer dispenses with recurrence and convolutions.",
+            supporting_quote="dispensing with recurrence and convolutions entirely",
+            unrelated_quote=(
+                "The best performing models also connect the encoder and decoder "
+                "through an attention mechanism."
+            ),
+        )
+
+        rows = ClaimEvidenceAdapter().convert(passage, output)
+
+        assert len(rows) == 3
+        assert [row.output for row in rows] == [
+            "supported",
+            "not enough information",
+            "dispensing with recurrence and convolutions entirely",
+        ]
+
     def test_evidence_selection_keeps_verified_candidate(self, passage):
         output = EvidenceSelections(
             items=[

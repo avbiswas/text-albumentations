@@ -15,6 +15,7 @@ from conftest import FakeModel
 
 EXPECTED_TASKS = {
     "bullets",
+    "claim_evidence_plan",
     "qa_pairs",
     "rephrase",
     "continuation",
@@ -34,6 +35,8 @@ EXPECTED_TASKS = {
     "method_steps",
     "structured_records",
     "section_heading",
+    "sentence_contrast_plan",
+    "sentence_equivalence_plan",
     "query_generation",
     "distractor_qa",
     "error_correction",

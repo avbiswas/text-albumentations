@@ -168,6 +168,9 @@ Built-in augmentations:
 | `style_transfer` | Rewrites the passage in a target style (`eli5`, `formal`, `casual`, or a custom description). |
 | `backtranslation` | Generates the instruction the passage would be the ideal answer to (instruction backtranslation); the passage itself becomes the output. |
 | `counterfactual` | Alters a central claim of the passage and asks what would follow, with a passage-grounded answer. |
+| `sentence_equivalence_plan` | Generates meaning-preserving sentence rewrites and expands them into similarity, equivalence, and entailment rows. |
+| `sentence_contrast_plan` | Generates controlled replacement operators and expands them into contradiction, non-equivalence, correction, and replacement-detection rows. |
+| `claim_evidence_plan` | Generates a claim with verified supporting and unrelated quotes, then emits FEVER-style evidence rows. |
 | `evidence_selection` | Builds claim-to-evidence examples where the model chooses the supporting quote from candidate quotes. |
 | `claim_verification` | Generates supported, contradicted, or not-enough-information claim verification rows. |
 | `entity_extraction` | Extracts named entities and domain concepts with typed labels and short contexts. |

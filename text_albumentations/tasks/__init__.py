@@ -4,6 +4,8 @@ from text_albumentations.tasks.bullets import bullet_augmentation
 from text_albumentations.tasks.bullets import main as generate_bullets
 from text_albumentations.tasks.classification import classification_augmentation
 from text_albumentations.tasks.classification import main as generate_classification
+from text_albumentations.tasks.claim_evidence_plan import claim_evidence_augmentation
+from text_albumentations.tasks.claim_evidence_plan import main as generate_claim_evidence
 from text_albumentations.tasks.claim_verification import claim_verification_augmentation
 from text_albumentations.tasks.claim_verification import main as generate_claim_verification
 from text_albumentations.tasks.cloze import cloze_augmentation
@@ -38,6 +40,10 @@ from text_albumentations.tasks.query_generation import main as generate_query_ge
 from text_albumentations.tasks.query_generation import query_generation_augmentation
 from text_albumentations.tasks.section_heading import main as generate_section_heading
 from text_albumentations.tasks.section_heading import section_heading_augmentation
+from text_albumentations.tasks.sentence_contrast_plan import main as generate_sentence_contrast
+from text_albumentations.tasks.sentence_contrast_plan import sentence_contrast_augmentation
+from text_albumentations.tasks.sentence_equivalence_plan import main as generate_sentence_equivalence
+from text_albumentations.tasks.sentence_equivalence_plan import sentence_equivalence_augmentation
 from text_albumentations.tasks.style_transfer import (
     casual_style_augmentation,
     eli5_style_augmentation,
@@ -58,6 +64,7 @@ __all__ = [
     "backtranslation_augmentation",
     "bullet_augmentation",
     "casual_style_augmentation",
+    "claim_evidence_augmentation",
     "claim_verification_augmentation",
     "classification_augmentation",
     "cloze_augmentation",
@@ -74,6 +81,7 @@ __all__ = [
     "formal_style_augmentation",
     "generate_backtranslation",
     "generate_bullets",
+    "generate_claim_evidence",
     "generate_claim_verification",
     "generate_classification",
     "generate_cloze",
@@ -92,6 +100,8 @@ __all__ = [
     "generate_rephrase",
     "generate_retrieval",
     "generate_section_heading",
+    "generate_sentence_contrast",
+    "generate_sentence_equivalence",
     "generate_style_transfer",
     "generate_structured_records",
     "generate_summaries",
@@ -103,6 +113,8 @@ __all__ = [
     "rephrase_augmentation",
     "retrieval_augmentation",
     "section_heading_augmentation",
+    "sentence_contrast_augmentation",
+    "sentence_equivalence_augmentation",
     "style_transfer_augmentation",
     "structured_records_augmentation",
     "summarize_augmentation",
